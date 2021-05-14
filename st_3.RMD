@@ -1,0 +1,313 @@
+---
+title: <center>ST-3 SAGD Data</center>
+author: <center>Andrew Leach</center>
+date: <center>`r format(Sys.time(), '%d %B, %Y')`</center>
+output:
+  html_document:
+      code_folding: hide
+      includes:
+      after_body: 
+      theme: lumen
+  always_allow_html: yes
+
+---
+
+The Alberta Energy Regulator (AER) provides monthly data for oil production in Alberta, including from the oil sands region in a report known as the ST-3.  The data are available [here](https://www.aer.ca/providing-information/data-and-reports/statistical-reports/st3), and you can either download the data and analyze it yourself or use the embedded R code below to download all the data. 
+
+This page is also an easy introduction for downloading and manipulating data in R. If you're going to run the R code, you'll need a few basic set-up elements to get everything to work. I've included the code here for your reference.
+
+```{r basics, cache=FALSE,warning=FALSE,message=FALSE}
+#packages used
+library(tidyverse) #basic set of data wrangling tools from the best part of the R universe
+library(readxl) #it does what it says
+library(scales) #makes graphs nicer
+library(lubridate) #makes dates easier to handle
+library(knitr) #using this to make the html document
+library(prettydoc) #nice tables in the html doc
+library(zoo) #time series data
+library(viridis) #color-blind friendly palettes for graphs
+library(patchwork) #allows you to combine plots
+library(kableExtra) #nice tables in R Markdown
+library(curl) #use this for checking internet connections
+library(roll) #rolling means 
+
+#unit conversions
+m3_bbl<-function(x) x*6.2898
+bbl_m3<-function(x) x/6.2898
+
+
+#create tableau palettes 
+
+colors_tableau10 <- function()
+{
+  return(c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD", "#8C564B",
+           "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF"))
+}
+
+colors_tableau10_light <- function()
+{
+  return(c("#AEC7E8", "#FFBB78", "#98DF8A", "#FF9896", "#C5B0D5", "#C49C94",
+           "#F7B6D2", "#C7C7C7", "#DBDB8D", "#9EDAE5"))
+}
+
+colors_tableau10_medium <- function()
+{
+  return(c("#729ECE", "#FF9E4A", "#67BF5C", "#ED665D", "#AD8BC9", "#A8786E",
+           "#ED97CA", "#A2A2A2", "#CDCC5D", "#6DCCDA"))
+}
+#basic graph theme
+weekly_small<-function(caption_align=1){
+  theme_minimal()+theme(
+    plot.margin = margin(.25, .75, .25, .75, "cm"),
+    legend.position = "bottom",
+    legend.margin=margin(c(0,0,0,0),unit="cm"),
+    legend.text = element_text(colour="black", size = 9),
+    plot.caption = element_text(size = 9, face = "italic",hjust=caption_align),
+    plot.title = element_text(size = 12,face = "bold"),
+    plot.subtitle = element_text(size = 11, face = "italic"),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 11,face = "bold"),
+    axis.title.x = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 15, b = 0)),
+    axis.text = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 10, b = 10)),
+  )
+}
+
+```
+
+# Download the Data
+
+Once you've got the preliminaries of the code, downloading the data is fairly easy.  Each of the data files are stored by year, with the exception of the current year which is has a different naming convention.  The first step is to access the data (click on the code button to see how to do things in R if you're interested).  The code also includes some fixes for names of projects which are not consistent in the data.  This is basically a trial and error process to find broken data series.
+
+```{r st3_data, cache=FALSE,warning=FALSE,message=FALSE} 
+#I'm going to make a function here so that I can specify whether I want to download all/none/new
+
+st_3_online<-function(download="all"){
+   #every year is xlss file which makes it easy
+#specify the rows we're going to want
+keep_rows<-c("Crude Oil Light",  "Crude Oil Medium",
+             "Crude Oil Heavy","Crude Oil Ultra Heavy","Total Conventional Oil Production",
+             "Condensate Production","In Situ Production","Mined Production",
+             "Non-Upgraded Total","Upgraded Production","Total Oil Sands Production",
+             "Total Production")
+#use a list to store each of the data sets we're going to download
+data_store <- list()
+years<-seq(2010,2016)
+i<-1
+for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
+  filename<-paste("Oil_2010-2016.xlsx",sep="")
+  if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
+        if(has_internet()) #if you're connected, go get the file
+          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+  production_data <- read_excel(filename, sheet = as.character(year), skip = 4)
+  #the sheets are a bit of a mess, so we need to clean them up
+  names(production_data)[1]<-"product" #name column 1
+  # the %>% or pipeline is basically a  "pass to" command
+  # start with production data, pass to select and remove cols 2 and 15, pass to filter and keep and rows with
+  # the names in the keep_rows object we created above
+  production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
+  #rename the column with the annual data s (grep is a search function that, in this case, is looking for
+  #whatever year we're processing and it will name the column annual
+  names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+  #assign the year to whatver year we're processing
+  production_data$year<-year
+  # create a long-form data set that will have product, annual level for that product, the year we're processing, and     #the monthly data
+  production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                            names_to="month",values_to = "production")
+  #store those data in a node in the list
+  data_store[[i]]<-production_data
+  #step your list counter one unit
+  i<-i+1
+  }
+  #let's get 2017-2020 data - same process, but they are in seperate files
+  years<-seq(2017,2020)
+  for(year in years){ #loop over 2017-2020
+    filename<-paste("Oil_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
+        if(has_internet()) #if you're connected, go get the file
+          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+      production_data <- read_excel(filename, sheet = "Data", skip = 4)
+    names(production_data)[1]<-"product"
+    production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
+    names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+    production_data$year<-year
+    production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                              names_to="month",values_to = "production")
+    data_store[[i]]<-production_data
+    i<-i+1
+  }
+  #Most recent data are stored as "current"  
+  year<-"Current"
+  filename<-paste("Oil_current.xlsx",sep="")
+  #check for internet
+  if(tolower(download)%in% c("all","current"))#if you chose to download all or current data. correct case errors
+        if(has_internet()) #if you're connected, go get the file
+          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+  production_data <- read_excel(filename, sheet = "Data", skip = 4)
+  year<-2021
+  names(production_data)[1]<-"product"
+  production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
+  names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+  production_data$year<-year
+  production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                              names_to="month",values_to = "production")
+  production_data<-production_data %>% filter(production!=0)#keep only non-zero production
+  data_store[[i]]<-production_data
+  
+  #now, stack all the elements stored in your list of data into a data frame
+  all_production<-do.call(rbind,data_store)
+  #now, we'll manipulate the data. mutate is adding a column based on a calculation
+  #so, all_production is all_prodcution passed to mutate, where the production variable is set to numeric
+  #and we format the dates using ymd since that's the format in the spreadsheet
+  # (remember, the lubridate package makes dates easy)
+  all_production<-all_production %>% mutate(production=as.numeric(production),
+                                            date=ymd(paste(year,as.character(month),1,sep="-")))
+         
+
+  #next part is working with factors. Factors basically store data as a numeric code or level (1,2,3,4) and a
+  #set of labels attached to the levels
+  
+  #take all_production,and pass to mutate, change the column product to a factor 
+  all_production <-all_production %>% mutate(product=as_factor(product)) %>%
+                                      #and now we're going to re-code some of the labels so that we make them common                                          #across the data we loaded
+                                      mutate(
+                                             product=fct_recode(product,
+                                                                "In Situ Bitumen Production"="In Situ Production",
+                                                                "Mined Bitumen Production"="Mined Production"
+                                                                ),
+                                             #and we're going to sort them so that mined bitumen is last
+                                             product=fct_relevel(product,"Mined Bitumen Production",after=5))
+ #last, we're going to collapse factors into on common level, so light and medium go into light, heavy and ultra-heavy 
+ #are classified as heavy
+  
+  all_production <-all_production %>% mutate(product=fct_collapse(product,
+                        "Conventional Light Oil Production" = c("Crude Oil Light","Crude Oil Medium"),
+                        "Conventional Heavy Oil Production"= c("Crude Oil Heavy","Crude Oil Ultra Heavy")
+                        )) %>% 
+    #now, because for some rows we'll now have 2 entries for production from conventional light oil, for example, 
+    # in a month, we have to collapse them
+    #group your data by product, year, month, and date
+                    group_by(product,year,month,date)%>%
+    #and combined the monthly and annual production from all prducts with the same label by summing them
+                          summarize(production=sum(production),annual=sum(as.numeric(annual))) %>%
+                          ungroup()
+    
+  #last thing - we'll use zoo to create some time series descriptives
+  #add year and quarter
+  all_production <-all_production %>% mutate(year=year(date), quarter=quarter(date))%>%
+  #add rolling quarterly and annual data and lags
+    group_by(product)%>% arrange(date)%>% mutate(
+      roll_4m=roll_mean(production,4),
+      roll_12m=roll_sum(production,12),
+      growth_12m=(roll_12m-lag(roll_12m,12))/lag(roll_12m,12),
+      lag12_raw=(production-lag(production,12))/lag(production,12),
+      lag12_roll=(roll_4m-lag(roll_4m,12))/lag(roll_4m,12))
+  #and that's it - you've made a data set of Alberta oil production for the last decade
+  
+  all_production # the last thing the function does is what it returns. We want it to return the data set
+  
+}
+
+all_production<-st_3_online(download = "all") #call the function we just made to get the data
+
+#create an annual data set using group_by and summarize
+  
+  annual<-all_production %>% group_by(year,product) %>% summarise(production=sum(production))
+  annual <-annual %>%arrange(year)%>% group_by(product)%>%
+    mutate(yoy_growth=round((production-lag(production,1))/lag(production,1)*100,2))
+  
+  #same for a quarterly data_set
+  
+  quarterly<-all_production %>% group_by(year,quarter,product) %>% summarise(production=mean(production))
+  quarterly <-quarterly %>%arrange(year,quarter)%>% group_by(product)%>%
+    mutate(q_lasty=round((production-lag(production,4))/lag(production,4)*100,2))
+```
+
+With the data downloaded and compiled into a single file, with annual and quarterly subfiles, we can graph some data.
+
+
+```{r st3_graphs, cache=FALSE}
+
+graph_data<-c("Conventional Light Oil Production","Conventional Heavy Oil Production","Condensate Production",
+               "In Situ Bitumen Production","Mined Bitumen Production")
+
+all_crude<-ggplot(filter(all_production,product%in%graph_data))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product))+
+  scale_fill_manual("",values = colors_tableau10(),guide = "legend")+
+  scale_x_date(date_breaks = "6 months",date_labels =  "%b\n%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  guides(fill=guide_legend(nrow=2))+
+  expand_limits(x = ymd("2020-02-01"))+
+  theme(panel.border = element_blank(),
+        plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil and Bitumen Production (Millions of barrels per day)",x=NULL,
+       title="Alberta Conventional Oil and Bitumen Production",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
+#if you want to create a png in normal code, use this
+#ggsave(all_crude,"oil_prod.png",width=12,height=6)
+
+oil_sands<-ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product))+
+  scale_fill_manual("",values = colors_tableau10(),guide = "legend")+
+  scale_x_date(date_breaks = "6 months",date_labels =  "%b\n%Y",,expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #guides(fill=FALSE,colour=FALSE)+
+  theme_classic() +
+  guides(fill=guide_legend(nrow=1))+
+  theme(plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
+       title="Alberta Oil Sands Bitumen Production",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""),
+       NULL)
+#if you want to create a png in normal code, use this
+#ggsave(oil_sands,"oil_sands_prod.png",width=12,height=6)
+```
+
+### Oil sands
+
+```{r fig.width=12, fig.height=8,dpi=300, plot_1, cache=FALSE}
+oil_sands
+```
+
+### All production
+
+```{r fig.width=12, fig.height=8,,dpi=300, plot_2, cache=FALSE}
+all_crude
+```
