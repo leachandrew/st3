@@ -1,5 +1,5 @@
 ---
-title: <center>ST-3 SAGD Data</center>
+title: <center>ST-3 Oil Production Data</center>
 author: <center>Andrew Leach</center>
 date: <center>`r format(Sys.time(), '%d %B, %Y')`</center>
 output:
@@ -238,6 +238,7 @@ all_crude<-ggplot(filter(all_production,product%in%graph_data))+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   guides(fill=guide_legend(nrow=2))+
   expand_limits(y=4)+
+  expand_limits(x=Sys.Date())+
   theme(panel.border = element_blank(),
         plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
         panel.grid = element_blank(),
@@ -273,6 +274,7 @@ oil_sands<-ggplot(filter(all_production,product%in%graph_data,product!="Total Co
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #guides(fill=FALSE,colour=FALSE)+
   theme_classic() +
+  expand_limits(x=Sys.Date())+
   guides(fill=guide_legend(nrow=1))+
   theme(plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
         panel.border = element_blank(),
