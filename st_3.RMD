@@ -228,7 +228,7 @@ all_production<-st_3_online(download = "all") #call the function we just made to
 With the data downloaded and compiled into a single file, with annual and quarterly subfiles, we can graph some data.
 
 
-```{r st3_graphs, cache=FALSE}
+```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
 
 graph_data<-c("Conventional Light Oil Production","Conventional Heavy Oil Production","Condensate Production",
                "In Situ Bitumen Production","Mined Bitumen Production")
