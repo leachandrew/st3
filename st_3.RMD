@@ -371,17 +371,17 @@ oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="To
 
 ### Oil sands
 
-```{r fig.width=12, fig.height=8,dpi=300, plot_1, cache=FALSE}
+```{r oil_sands, fig.width=12, fig.height=7,dpi=300}
 oil_sands
 ```
 
 
-```{r fig.width=12, fig.height=8,dpi=300, plot_1b, cache=FALSE}
+```{r oil_sands_plain, fig.width=14,fig.height=7,dpi=300}
 oil_sands_plain
 ```
 
 ### All production
 
-```{r fig.width=12, fig.height=8,,dpi=300, plot_2, cache=FALSE}
+```{r all_crude, fig.width=14,fig.height=7,dpi=300}
 all_crude
 ```
