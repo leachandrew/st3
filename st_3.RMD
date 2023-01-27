@@ -1,7 +1,7 @@
 ---
-title: <center>ST-3 Oil Production Data</center>
-author: <center>Andrew Leach</center>
-date: <center>`r format(Sys.time(), '%d %B, %Y')`</center>
+title: ST-3 Oil Production Data
+author: Andrew Leach
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
       code_folding: hide
@@ -76,7 +76,7 @@ weekly_small<-function(caption_align=1){
 
 # Download the Data
 
-Once you've got the preliminaries of the code, downloading the data is fairly easy.  Each of the data files are stored by year, with the exception of the current year which is has a different naming convention.  The first step is to access the data (click on the code button to see how to do things in R if you're interested).  The code also includes some fixes for names of projects which are not consistent in the data.  This is basically a trial and error process to find broken data series.
+Once you've got the preliminaries of the code, downloading the data is fairly easy.  Each of the data files are stored by year, with the exception of the current year which has a different naming convention.  The first step is to access the data (click on the code button to see how to do things in R if you're interested).  The code also includes some fixes for names of projects which are not consistent in the data.  This is basically a trial and error process to find broken data series.
 
 ```{r st3_data, cache=FALSE,warning=FALSE,message=FALSE} 
 #I'm going to make a function here so that I can specify whether I want to download all/none/new
