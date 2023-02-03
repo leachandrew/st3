@@ -385,3 +385,17 @@ oil_sands_plain
 ```{r all_crude, fig.width=14,fig.height=7,dpi=300}
 all_crude
 ```
+
+
+### Production Table
+
+
+```{r, echo = T,eval=T}
+  annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Total Oil Sands Production","Total Production")) %>%
+  mutate(production=m3_bbl(production)/10^6/365)%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
+  rename(Year=year)%>%
+   kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
+    kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
+  #scroll_box(width = "1000px", height = "600px")%>%
+      I() 
+```
