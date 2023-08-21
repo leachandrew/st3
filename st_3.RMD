@@ -1,7 +1,7 @@
 ---
 title: ST-3 Oil Production Data
 author: Andrew Leach
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: <p>`r format(Sys.time(), '%d %B, %Y')`</p>
 output:
   html_document:
       code_folding: hide
@@ -93,11 +93,12 @@ keep_rows<-c("Crude Oil Light",  "Crude Oil Medium",
 data_store <- list()
 years<-seq(2010,2016)
 i<-1
-for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
   filename<-paste("Oil_2010-2016.xlsx",sep="")
   if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
         if(has_internet()) #if you're connected, go get the file
           download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+#year<-2010 #testing
+for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
   production_data <- read_excel(filename, sheet = as.character(year), skip = 4)
   #the sheets are a bit of a mess, so we need to clean them up
   names(production_data)[1]<-"product" #name column 1
@@ -120,9 +121,11 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   }
   #let's get 2017-2020 data - same process, but they are in seperate files
   #https://static.aer.ca/prd/documents/sts/st3/ST3_2021-12_Oil.xlsx
-  years<-seq(2017,2021)
+  years<-seq(2017,2022)
   for(year in years){ #loop over 2017-2020
     filename<-paste("Oil_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(year==2022)
+        filename<-"ST3_2022-12_Oil.xlsx"
     if(year==2021)
         filename<-"ST3_2021-12_Oil.xlsx"
     if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
@@ -146,7 +149,7 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
         if(has_internet()) #if you're connected, go get the file
           download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
   production_data <- read_excel(filename, sheet = "Data", skip = 4)
-  year<-2022
+  year<-2023
   names(production_data)[1]<-"product"
   production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
   names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
