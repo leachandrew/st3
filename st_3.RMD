@@ -96,6 +96,7 @@ i<-1
   filename<-paste("Oil_2010-2016.xlsx",sep="")
   if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
         if(has_internet()) #if you're connected, go get the file
+          if(!file.exists(filename))
           download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
 #year<-2010 #testing
 for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
@@ -130,8 +131,9 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
         filename<-"ST3_2021-12_Oil.xlsx"
     if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
         if(has_internet()) #if you're connected, go get the file
-          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
-      production_data <- read_excel(filename, sheet = "Data", skip = 4)
+          if(!file.exists(filename))
+            download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+    production_data <- read_excel(filename, sheet = "Data", skip = 4)
     names(production_data)[1]<-"product"
     production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
     names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
