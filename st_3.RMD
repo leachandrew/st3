@@ -1,7 +1,7 @@
 ---
 title: ST-3 Oil Production Data
 author: Andrew Leach
-date: <p>`r format(Sys.time(), '%d %B, %Y')`</p>
+date: <p>`r format(Sys.time(), '%B, %Y')`</p>
 output:
   html_document:
       code_folding: hide
@@ -9,7 +9,7 @@ output:
       after_body: 
       theme: lumen
   always_allow_html: yes
-
+editor: source
 ---
 
 The Alberta Energy Regulator (AER) provides monthly data for oil production in Alberta, including from the oil sands region in a report known as the ST-3.  The data are available [here](https://www.aer.ca/providing-information/data-and-reports/statistical-reports/st3), and you can either download the data and analyze it yourself or use the embedded R code below to download all the data. 
@@ -224,7 +224,9 @@ all_production<-st_3_online(download = "all") #call the function we just made to
   annual <-annual %>%arrange(year)%>% group_by(product)%>%
     mutate(yoy_growth=round((production-lag(production,1))/lag(production,1)*100,2))
   
-  #same for a quarterly data_set
+#create an annual data set using group_by and summarize
+  
+#same for a quarterly data_set
   
   quarterly<-all_production %>% group_by(year,quarter,product) %>% summarise(production=mean(production))
   quarterly <-quarterly %>%arrange(year,quarter)%>% group_by(product)%>%
@@ -301,7 +303,8 @@ save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
 
 oil_sands<-ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
-  scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
+  #scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
+  scale_fill_manual("",values = pal_jco()(2),guide = "legend")+
   scale_x_date(date_breaks = "6 months",date_labels =  "%b\n%Y",,expand = c(0,0))+
   scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
   expand_limits(y=4)+
@@ -393,12 +396,29 @@ all_crude
 ```
 
 
-### Production Table
+### Recent Production (mmbbl/d)
+```{r, echo = T,eval=T}
+  all_production%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production"),date>=max(date)-years(1)) %>%
+  select(product,date,production)%>%
+  mutate(production=m3_bbl(production)/10^6/days_in_month(date),
+         product=gsub(" Production","",product))%>%
+  pivot_wider(names_from=product,values_from = production)%>%
+  mutate(date=format(date,"%b %Y")
+         )%>%rename(Date=date)%>%
+   kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
+    kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
+  #scroll_box(width = "1000px", height = "600px")%>%
+      I() 
+```
 
+
+
+### Annual Production (mmbbl/d)
 
 ```{r, echo = T,eval=T}
-  annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Total Oil Sands Production","Total Production")) %>%
-  mutate(production=m3_bbl(production)/10^6/365)%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
+  annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production")) %>%
+  mutate(production=m3_bbl(production)/10^6/365,
+         product=gsub(" Production","",product))%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
   rename(Year=year)%>%
    kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
     kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
