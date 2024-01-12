@@ -30,6 +30,7 @@ library(patchwork) #allows you to combine plots
 library(kableExtra) #nice tables in R Markdown
 library(curl) #use this for checking internet connections
 library(roll) #rolling means 
+library(ggsci)
 
 #unit conversions
 m3_bbl<-function(x) x*6.2898
@@ -241,12 +242,12 @@ graph_data<-c("Conventional Light Oil Production","Conventional Heavy Oil Produc
 all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
                     mutate(product=fct_relevel(product,"Condensate Production")))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
-  #scale_fill_manual("",values = colors_tableau10(),guide = "legend")+
-  scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
+  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
   scale_x_date(date_breaks = "6 months",date_labels =  "%b\n%Y",expand = c(0,0))+
   scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
-  guides(fill=guide_legend(nrow=2))+
+  guides(fill=guide_legend(nrow=1))+
   expand_limits(y=4)+
   expand_limits(x=Sys.Date())+
   theme(panel.border = element_blank(),
