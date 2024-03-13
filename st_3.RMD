@@ -123,9 +123,11 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   }
   #let's get 2017-2020 data - same process, but they are in seperate files
   #https://static.aer.ca/prd/documents/sts/st3/ST3_2021-12_Oil.xlsx
-  years<-seq(2017,2022)
+  years<-seq(2017,2023)
   for(year in years){ #loop over 2017-2020
     filename<-paste("Oil_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(year==2023)
+        filename<-"ST3_2023-12_Oil.xlsx"
     if(year==2022)
         filename<-"ST3_2022-12_Oil.xlsx"
     if(year==2021)
@@ -147,12 +149,11 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   #Most recent data are stored as "current"  
   year<-"Current"
   filename<-paste("Oil_current.xlsx",sep="")
-  #check for internet
-  if(tolower(download)%in% c("all","current"))#if you chose to download all or current data. correct case errors
-        if(has_internet()) #if you're connected, go get the file
+  #check for interne
+  if(has_internet()) #if you're connected, go get the file
           download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
   production_data <- read_excel(filename, sheet = "Data", skip = 4)
-  year<-2023
+  year<-2024
   names(production_data)[1]<-"product"
   production_data<-production_data %>% select(-2,-15) %>% filter(product %in% keep_rows)
   names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
