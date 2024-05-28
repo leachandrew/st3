@@ -221,15 +221,20 @@ all_production<-st_3_online(download = "all") #call the function we just made to
 
 #create an annual data set using group_by and summarize
   
-  annual<-all_production %>% group_by(year,product) %>% summarise(production=sum(production))
-  annual <-annual %>%arrange(year)%>% group_by(product)%>%
+  annual<-all_production %>% 
+    mutate(days=days_in_month(date))%>%
+    group_by(year,product) %>% summarise(production=sum(production),
+          days=sum(days))%>%
+    arrange(year)%>% group_by(product)%>%
     mutate(yoy_growth=round((production-lag(production,1))/lag(production,1)*100,2))
   
 #create an annual data set using group_by and summarize
   
 #same for a quarterly data_set
   
-  quarterly<-all_production %>% group_by(year,quarter,product) %>% summarise(production=mean(production))
+  quarterly<-all_production %>% 
+    mutate(days=days_in_month(date))%>%
+    group_by(year,quarter,product) %>% summarise(production=mean(production),days=sum(days))
   quarterly <-quarterly %>%arrange(year,quarter)%>% group_by(product)%>%
     mutate(q_lasty=round((production-lag(production,4))/lag(production,4)*100,2))
 ```
@@ -419,9 +424,11 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
 
 ```{r, echo = T,eval=T}
   annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production")) %>%
-  mutate(production=m3_bbl(production)/10^6/365,
+  mutate(production=m3_bbl(production)/10^6/days,
          product=gsub(" Production","",product))%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
   rename(Year=year)%>%
+  select(-days)%>%
+  mutate(Year=ifelse(Year==last(Year),paste(Year,"(to date)"),Year))%>%
    kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
     kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
   #scroll_box(width = "1000px", height = "600px")%>%
