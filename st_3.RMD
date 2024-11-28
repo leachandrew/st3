@@ -434,3 +434,49 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
   #scroll_box(width = "1000px", height = "600px")%>%
       I() 
 ```
+
+```{r,eval=FALSE,echo=FALSE,include=FALSE}
+#make an appi
+base_year<-2018
+all_production%>%
+  group_by(product)%>%
+  mutate(index_val=production/max(production*(date==ymd(paste(base_year,"-01-01",sep="-"))))*100)%>%
+  filter(grepl("Total",product),
+         year(date)>=2014)%>%
+  ggplot()+
+  geom_line(aes(date,index_val,group=product,colour=product),size=1.25)+
+  #geom_line(data=rspi_data,aes(ref_date,value,colour="RSPI (2013=100)"),size=1.5)+
+  scale_colour_manual("",values=colors_tableau10())+
+  
+  geom_vline(aes(xintercept = ymd("2019-01-01")),lty="22",size=.85)+
+  annotate(geom = "text",x = ymd("2019-01-01"),y=30,label="Before carbon pricing",hjust=1.15,size=2.5)+
+  annotate(geom = "text",x = ymd("2019-01-01"),y=30,label="After carbon pricing",hjust=-0.15,size=2.5)+
+  annotate(geom = "text",x = ymd("2022-04-01"),y=30,label="April 1, 2022",hjust=-0.15,size=2.5)+
+  geom_vline(aes(xintercept = ymd("2022-04-01")),lty="22",size=.85)+
+  
+  scale_fill_manual("",values=colors_tableau10())+
+  scale_x_date(date_breaks = "1 year",date_labels = "%Y",expand=c(0,0))+
+  theme_minimal()+
+  scale_y_continuous(breaks = pretty_breaks(n=8),expand=c(0,0))+
+  expand_limits(y=c(0,160))+
+  #guides(fill = guide_legend(nrow = 3))+
+  theme(
+    #legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.margin=margin(c(0,0,0,0),unit="cm"),
+    axis.text.x = element_text(margin=margin(c(.3,.1,.1,.1),unit="cm")),
+    legend.text = element_text(colour="black", size = 8, face = "bold"),
+    plot.caption=element_text(hjust = 0,size=7),
+    plot.title=element_text(hjust = 0,size=18)
+    )+
+  labs(x="",y=paste("Index Value (",base_year,"=100)",sep=""),
+       title="APPI Before and After Carbon Pricing",
+       #subtitle="Canadian Refinery Production",
+       caption="Data via Government of Alberta. Calculations and graph by Andrew Leach")
+
+ggsave("appi.png",width = 8,height = 4,bg="white",dpi=300)
+
+
+
+```
