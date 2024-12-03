@@ -394,6 +394,8 @@ oil_sands
 ```{r oil_sands_plain, fig.width=14,fig.height=7,dpi=300}
 oil_sands_plain
 ```
+[Click here for high-resolution, colour image](st3_oil_sands_prod.png)
+
 
 ### All production
 
@@ -401,7 +403,7 @@ oil_sands_plain
 all_crude
 ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg="white")
 ```
-
+[Click here for high-resolution image](st3_oil_prod.png)
 
 ### Recent Production (mmbbl/d)
 ```{r, echo = T,eval=T}
