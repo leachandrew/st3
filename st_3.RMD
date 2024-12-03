@@ -417,6 +417,7 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
    kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
     kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
   #scroll_box(width = "1000px", height = "600px")%>%
+  column_spec(1, extra_css = "white-space: nowrap;") %>%
       I() 
 ```
 
@@ -434,6 +435,7 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
    kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
     kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
   #scroll_box(width = "1000px", height = "600px")%>%
+  column_spec(1, extra_css = "white-space: nowrap;") %>%
       I() 
 ```
 
