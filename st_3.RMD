@@ -256,7 +256,7 @@ all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
   scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   guides(fill=guide_legend(nrow=1))+
-  expand_limits(y=4)+
+  expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
   theme(panel.border = element_blank(),
         plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
