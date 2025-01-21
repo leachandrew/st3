@@ -484,3 +484,53 @@ ggsave("appi.png",width = 8,height = 4,bg="white",dpi=300)
 
 
 ```
+
+
+
+```{r,fig.width=16,fig.height=8,dpi=300}
+
+line_top<-4.2
+label_val<-4.3
+all_crude+
+  expand_limits(y=4.8)+
+  coord_cartesian(clip = 'off') +   # This keeps the labels from disappearing
+  theme(plot.margin = unit(c(4,1,1,3), "cm"),
+        plot.title = element_text(
+      size = 16, # Adjust the font size of the title
+      margin = margin(t = 0, r = 0, b = 40, l = 0)),
+      panel.background = element_rect(fill = "white") 
+      )+ # Add margins
+  
+  
+  annotate(geom = "text",x = ymd("2010-05-01"),y=label_val,label="SGER in place ($15/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2010-01-01"), xend = ymd("2010-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+  
+  annotate(geom = "text",x = ymd("2016-01-01"),y=label_val,label="Alberta SGER Increased ($20/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2016-01-01"), xend = ymd("2016-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+
+ 
+  annotate(geom = "text",x = ymd("2017-01-01"),y=label_val,label="Alberta SGER Increased ($30/t)",hjust=0.05,,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2017-01-01"), xend = ymd("2017-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+  
+  
+  annotate(geom = "text",x = ymd("2018-01-01"),y=label_val,label="Alberta adopts CCIR ($30/t)",hjust=0.05,,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2018-01-01"), xend = ymd("2018-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+ 
+  annotate(geom = "text",x = ymd("2020-01-01"),y=label_val,label="Alberta adopts TIER ($30/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2020-01-01"), xend = ymd("2020-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+ 
+  geom_segment(aes(x = ymd("2021-04-01"), xend = ymd("2021-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2021-04-01"),y=label_val,label="Federal Benchmark Increased ($40/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2022-04-01"), xend = ymd("2022-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2022-04-01"),y=label_val,label="Federal Benchmark Increased ($50/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2023-04-01"), xend = ymd("2023-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2023-04-01"),y=label_val,label="Federal Benchmark Increased ($65/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2024-04-01"), xend = ymd("2024-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2024-04-01"),y=label_val,label="Federal Benchmark Increased ($80/t)",hjust=0.05,angle=45,size=2.5,angle=45)+
+ 
+  scale_linetype_manual("",values=c("22","22"),guide="none")
+
+```
