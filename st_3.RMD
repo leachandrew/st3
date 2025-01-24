@@ -487,7 +487,7 @@ ggsave("appi.png",width = 8,height = 4,bg="white",dpi=300)
 
 
 
-```{r,fig.width=16,fig.height=8,dpi=300}
+```{r,fig.width=16,fig.height=8,dpi=300,eval=FALSE}
 
 line_top<-4.2
 label_val<-4.3
