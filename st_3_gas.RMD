@@ -1,0 +1,530 @@
+---
+title: ST-3 Oil Production Data
+author: Andrew Leach
+date: <p>`r format(Sys.time(), '%B, %Y')`</p>
+output:
+  html_document:
+      code_folding: hide
+      includes:
+      after_body: 
+      theme: lumen
+  always_allow_html: yes
+editor: source
+---
+
+The Alberta Energy Regulator (AER) provides monthly data for oil production in Alberta, including from the oil sands region in a report known as the ST-3.  The data are available [here](https://www.aer.ca/providing-information/data-and-reports/statistical-reports/st3), and you can either download the data and analyze it yourself or use the embedded R code below to download all the data. 
+
+This page is also an easy introduction for downloading and manipulating data in R. If you're going to run the R code, you'll need a few basic set-up elements to get everything to work. I've included the code here for your reference.
+
+```{r basics, cache=FALSE,warning=FALSE,message=FALSE}
+#packages used
+library(tidyverse) #basic set of data wrangling tools from the best part of the R universe
+library(readxl) #it does what it says
+library(scales) #makes graphs nicer
+library(lubridate) #makes dates easier to handle
+library(knitr) #using this to make the html document
+library(prettydoc) #nice tables in the html doc
+library(zoo) #time series data
+library(viridis) #color-blind friendly palettes for graphs
+library(patchwork) #allows you to combine plots
+library(kableExtra) #nice tables in R Markdown
+library(curl) #use this for checking internet connections
+library(roll) #rolling means 
+library(ggsci)
+
+#unit conversions
+m3_bbl<-function(x) x*6.2898
+bbl_m3<-function(x) x/6.2898
+
+
+#create tableau palettes 
+
+colors_tableau10 <- function()
+{
+  return(c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD", "#8C564B",
+           "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF"))
+}
+
+colors_tableau10_light <- function()
+{
+  return(c("#AEC7E8", "#FFBB78", "#98DF8A", "#FF9896", "#C5B0D5", "#C49C94",
+           "#F7B6D2", "#C7C7C7", "#DBDB8D", "#9EDAE5"))
+}
+
+colors_tableau10_medium <- function()
+{
+  return(c("#729ECE", "#FF9E4A", "#67BF5C", "#ED665D", "#AD8BC9", "#A8786E",
+           "#ED97CA", "#A2A2A2", "#CDCC5D", "#6DCCDA"))
+}
+#basic graph theme
+weekly_small<-function(caption_align=1){
+  theme_minimal()+theme(
+    plot.margin = margin(.25, .75, .25, .75, "cm"),
+    legend.position = "bottom",
+    legend.margin=margin(c(0,0,0,0),unit="cm"),
+    legend.text = element_text(colour="black", size = 9),
+    plot.caption = element_text(size = 9, face = "italic",hjust=caption_align),
+    plot.title = element_text(size = 12,face = "bold"),
+    plot.subtitle = element_text(size = 11, face = "italic"),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 11,face = "bold"),
+    axis.title.x = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 15, b = 0)),
+    axis.text = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 10, b = 10)),
+  )
+}
+
+```
+
+# Download the Data
+
+Once you've got the preliminaries of the code, downloading the data is fairly easy.  Each of the data files are stored by year, with the exception of the current year which has a different naming convention.  The first step is to access the data (click on the code button to see how to do things in R if you're interested).  The code also includes some fixes for names of projects which are not consistent in the data.  This is basically a trial and error process to find broken data series.
+
+```{r st3_data, cache=FALSE,warning=FALSE,message=FALSE} 
+#I'm going to make a function here so that I can specify whether I want to download all/none/new
+
+st_3_online<-
+download<-"all"
+data_store <- list()
+years<-seq(2010,2016)
+i<-1
+  filename<-paste("Gas_2010-2016.xlsx",sep="")
+  if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
+        if(has_internet()) #if you're connected, go get the file
+          if(!file.exists(filename))
+          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+#year<-2010 #testing
+for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
+  production_data <- read_excel(filename, sheet = as.character(year), skip = 4)
+  #the sheets are a bit of a mess, so we need to clean them up
+  names(production_data)[1]<-"product" #name column 1
+  # the %>% or pipeline is basically a  "pass to" command
+  # start with production data, pass to select and remove cols 2 and 15, pass to filter and keep and rows with
+  # the names in the keep_rows object we created above
+  production_data<-production_data %>% select(-2,-15)%>% #%>% filter(product %in% keep_rows)
+  filter(!is.na(product),!is.na(Jan))%>%
+  mutate(across(-1, as.numeric))
+  #rename the column with the annual data s (grep is a search function that, in this case, is looking for
+  #whatever year we're processing and it will name the column annual
+  names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+  #assign the year to whatver year we're processing
+  production_data$year<-year
+  # create a long-form data set that will have product, annual level for that product, the year we're processing, and     #the monthly data
+  production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                            names_to="month",values_to = "production")
+  #store those data in a node in the list
+  data_store[[i]]<-production_data
+  #step your list counter one unit
+  i<-i+1
+  }
+  #let's get 2017-2020 data - same process, but they are in seperate files
+  #https://static.aer.ca/prd/documents/sts/st3/ST3_2021-12_Oil.xlsx
+  years<-seq(2017,2024)
+  #year<-2023
+  for(year in years){ #loop over 2017-2020
+    filename<-paste("Gas_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(year==2024)
+        filename<-"ST3_Gas_2024.xlsx"
+    if(year==2023)
+        filename<-"ST3_2023-12_Gas.xlsx"
+    if(year==2022)
+        filename<-"ST3_2022-12_Gas.xlsx"
+    if(year==2021)
+        filename<-"ST3_2021-12_Gas.xlsx"
+    if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
+        if(has_internet()) #if you're connected, go get the file
+          if(!file.exists(filename))
+            if(year!=2024)
+            download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+    if(has_internet()) #if you're connected, go get the file
+          if(!file.exists(filename))
+            if(year==2024)
+            download.file("https://www.aer.ca/2025-02/ST3_Gas_2024.xlsx",filename,mode="wb")
+    production_data <- read_excel(filename, sheet = "Data", skip = 4)
+    names(production_data)[1]<-"product"
+    production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
+  mutate(across(-1, as.numeric))
+    names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+    production_data$year<-year
+    production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                              names_to="month",values_to = "production")
+    data_store[[i]]<-production_data
+    i<-i+1
+  }
+  #Most recent data are stored as "current"  
+  year<-"Current"
+  filename<-paste("Gas_current.xlsx",sep="")
+  #check for interne
+  if(has_internet()) #if you're connected, go get the file
+          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+  production_data <- read_excel(filename, sheet = "Data", skip = 4)
+  year<-2025
+  names(production_data)[1]<-"product"
+  production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
+  mutate(across(-1, as.numeric))
+  names(production_data)[grep(as.character(year),names(production_data))]<-"annual"
+  production_data$year<-year
+  production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
+                                              names_to="month",values_to = "production")
+  production_data<-production_data %>% filter(production!=0)#keep only non-zero production
+  data_store[[i]]<-production_data
+  
+  #now, stack all the elements stored in your list of data into a data frame
+  gas_production<-do.call(rbind,data_store)
+  #now, we'll manipulate the data. mutate is adding a column based on a calculation
+  #so, all_production is all_prodcution passed to mutate, where the production variable is set to numeric
+  #and we format the dates using ymd since that's the format in the spreadsheet
+  # (remember, the lubridate package makes dates easy)
+  gas_production<-gas_production %>% mutate(production=as.numeric(production),
+                                            date=ymd(paste(year,as.character(month),1,sep="-")))
+         
+```
+
+With the data downloaded and compiled into a single file, with annual and quarterly subfiles, we can graph some data.
+
+
+```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
+
+graph_data<-c("Conventional Light Oil Production","Conventional Heavy Oil Production","Condensate Production",
+               "In Situ Bitumen Production","Mined Bitumen Production")
+
+all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
+                    mutate(product=fct_relevel(product,"Condensate Production")))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
+  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  guides(fill=guide_legend(nrow=1))+
+  expand_limits(y=4.5)+
+  expand_limits(x=Sys.Date())+
+  theme(panel.border = element_blank(),
+        plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil and Bitumen Production (Millions of barrels per day)",x=NULL,
+       title="Alberta Conventional Oil and Bitumen Production",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
+#if you want to create a png in normal code, use this
+#ggsave(all_crude,"oil_prod.png",width=12,height=6)
+
+all_crude_weekly<-ggplot(filter(all_production,product%in%graph_data))+
+  geom_area(aes(date,6.2898*(production)/days_in_month(date)/10^6,group=product,fill=product))+
+  scale_fill_manual("",values = colors_tableau10(),guide = "legend")+
+  scale_x_date(date_breaks = "6 months",date_labels =  "%b\n%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  guides(fill=guide_legend(nrow=2))+
+  scale_fill_manual(NULL,values=colors_ua10())+
+    scale_x_date(date_breaks = "1 year", date_labels =  "%b\n%Y",expand=c(0,0))+
+    scale_y_continuous(expand = c(0, 0)) +
+    guides(fill=guide_legend(nrow=2))+
+    labs(y="Oil and Bitumen Production (Millions of barrels per day)",x=NULL,
+       title="Alberta Conventional Oil and Bitumen Production",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))+
+  weekly_graphs()
+#if you want to create a png in normal code, use this
+
+save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
+
+#ggsave(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
+
+
+oil_sands<-
+  ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
+  #scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
+  scale_fill_manual("",values = pal_jco()(2),guide = "legend")+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",,expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  expand_limits(y=4)+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #guides(fill=FALSE,colour=FALSE)+
+  theme_classic() +
+  expand_limits(x=Sys.Date())+
+  guides(fill=guide_legend(nrow=1))+
+  theme(plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
+       title="Alberta Oil Sands Bitumen Production",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""),
+       NULL)
+
+
+upgraded<-
+  all_production%>%filter(product%in%c("Non-Upgraded Bitumen Production","Conventional Heavy Oil Production","Conventional Light Oil Production","Synthetic Crude Production","Condensate Production"))%>%
+  mutate(product=factor(product,levels =c("Non-Upgraded Bitumen Production","Conventional Heavy Oil Production","Conventional Light Oil Production","Synthetic Crude Production","Condensate Production")),
+         product=fct_rev(product)
+         )%>%
+  ggplot()+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
+  #scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
+  scale_fill_manual("",values = pal_jco()(5),guide = "legend")+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",,expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  expand_limits(y=4)+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #guides(fill=FALSE,colour=FALSE)+
+  theme_classic() +
+  expand_limits(x=Sys.Date())+
+  guides(fill=guide_legend(nrow=1))+
+  theme(plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil Production (millions of barrels per day)",x=NULL,
+       title="Alberta Oil Production",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""),
+       NULL)
+
+#if you want to create a png in normal code, use this
+ggsave(plot=upgraded,filename = "st3_oil_sands_upg.png",width=15,height=8,dpi=300,bg="white")
+
+
+oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
+  scale_fill_manual("",values = grey.colors(n=3,end=0.85,start = 0.3),guide = "legend")+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%b\n%Y",,expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  expand_limits(y=4)+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #guides(fill=FALSE,colour=FALSE)+
+  theme_classic() +
+  expand_limits(x=Sys.Date(),y=4.4)+
+  guides(fill=guide_legend(nrow=1))+
+  theme(plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
+       #title="Alberta Oil Sands Bitumen Production",
+       #caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph #by @andrew_leach",sep=""),
+       NULL)
+
+
+#if you want to create a png in normal code, use this
+ggsave(plot=oil_sands,filename = "st3_oil_sands_prod.png",width=12,height=6,dpi=300,bg="white")
+```
+
+### Oil sands
+
+```{r oil_sands, fig.width=12, fig.height=7,dpi=300}
+oil_sands
+```
+
+
+```{r oil_sands_plain, fig.width=14,fig.height=7,dpi=300}
+oil_sands_plain
+```
+[Click here for high-resolution, colour image](st3_oil_sands_prod.png)
+
+
+### All production
+
+```{r all_crude, fig.width=14,fig.height=7,dpi=300}
+all_crude
+ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg="white")
+```
+[Click here for high-resolution image](st3_oil_prod.png)
+
+
+```{r oil_upg, fig.width=15, fig.height=8,dpi=300}
+upgraded
+```
+[Click here for high-resolution image](st3_oil_sands_upg.png)
+
+
+
+### Recent Production (mmbbl/d)
+```{r, echo = T,eval=T}
+  all_production%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production"),date>=max(date)-years(1)) %>%
+  select(product,date,production)%>%
+  mutate(production=m3_bbl(production)/10^6/days_in_month(date),
+         product=gsub(" Production","",product))%>%
+  pivot_wider(names_from=product,values_from = production)%>%
+  mutate(date=format(date,"%b %Y")
+         )%>%rename(Date=date)%>%
+   kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
+    kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
+  #scroll_box(width = "1000px", height = "600px")%>%
+  column_spec(1, extra_css = "white-space: nowrap;") %>%
+      I() 
+```
+
+
+
+### Annual Production (mmbbl/d)
+
+```{r, echo = T,eval=T}
+  annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production")) %>%
+  mutate(production=m3_bbl(production)/10^6/days,
+         product=gsub(" Production","",product))%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
+  rename(Year=year)%>%
+  select(-days)%>%
+  mutate(Year=ifelse(Year==last(Year),paste(Year,"(to date)"),Year))%>%
+   kbl(escape = FALSE,table.attr = "style='width:100%;'") %>%
+    kable_styling(fixed_thead = T,bootstrap_options = c("hover", "condensed","responsive"),full_width = T)%>%
+  #scroll_box(width = "1000px", height = "600px")%>%
+  column_spec(1, extra_css = "white-space: nowrap;") %>%
+      I() 
+```
+
+```{r,eval=FALSE,echo=FALSE,include=FALSE}
+#make an appi
+base_year<-2018
+all_production%>%
+  group_by(product)%>%
+  mutate(index_val=production/max(production*(date==ymd(paste(base_year,"-01-01",sep="-"))))*100)%>%
+  filter(grepl("Total",product),
+         year(date)>=2014)%>%
+  ggplot()+
+  geom_line(aes(date,index_val,group=product,colour=product),size=1.25)+
+  #geom_line(data=rspi_data,aes(ref_date,value,colour="RSPI (2013=100)"),size=1.5)+
+  scale_colour_manual("",values=colors_tableau10())+
+  
+  geom_vline(aes(xintercept = ymd("2019-01-01")),lty="22",size=.85)+
+  annotate(geom = "text",x = ymd("2019-01-01"),y=30,label="Before carbon pricing",hjust=1.15,size=2.5)+
+  annotate(geom = "text",x = ymd("2019-01-01"),y=30,label="After carbon pricing",hjust=-0.15,size=2.5)+
+  annotate(geom = "text",x = ymd("2022-04-01"),y=30,label="April 1, 2022",hjust=-0.15,size=2.5)+
+  geom_vline(aes(xintercept = ymd("2022-04-01")),lty="22",size=.85)+
+  
+  scale_fill_manual("",values=colors_tableau10())+
+  scale_x_date(date_breaks = "1 year",date_labels = "%Y",expand=c(0,0))+
+  theme_minimal()+
+  scale_y_continuous(breaks = pretty_breaks(n=8),expand=c(0,0))+
+  expand_limits(y=c(0,160))+
+  #guides(fill = guide_legend(nrow = 3))+
+  theme(
+    #legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.margin=margin(c(0,0,0,0),unit="cm"),
+    axis.text.x = element_text(margin=margin(c(.3,.1,.1,.1),unit="cm")),
+    legend.text = element_text(colour="black", size = 8, face = "bold"),
+    plot.caption=element_text(hjust = 0,size=7),
+    plot.title=element_text(hjust = 0,size=18)
+    )+
+  labs(x="",y=paste("Index Value (",base_year,"=100)",sep=""),
+       title="APPI Before and After Carbon Pricing",
+       #subtitle="Canadian Refinery Production",
+       caption="Data via Government of Alberta. Calculations and graph by Andrew Leach")
+
+ggsave("appi.png",width = 8,height = 4,bg="white",dpi=300)
+
+
+
+```
+
+
+
+```{r,fig.width=16,fig.height=8,dpi=300,eval=FALSE}
+
+line_top<-4.2
+label_val<-4.3
+all_crude+
+  expand_limits(y=4.8)+
+  coord_cartesian(clip = 'off') +   # This keeps the labels from disappearing
+  theme(plot.margin = unit(c(4,1,1,3), "cm"),
+        plot.title = element_text(
+      size = 16, # Adjust the font size of the title
+      margin = margin(t = 0, r = 0, b = 40, l = 0)),
+      panel.background = element_rect(fill = "white") 
+      )+ # Add margins
+  
+  
+  annotate(geom = "text",x = ymd("2010-05-01"),y=label_val,label="SGER in place ($15/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2010-01-01"), xend = ymd("2010-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+  
+  annotate(geom = "text",x = ymd("2016-01-01"),y=label_val,label="Alberta SGER Increased ($20/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2016-01-01"), xend = ymd("2016-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+
+ 
+  annotate(geom = "text",x = ymd("2017-01-01"),y=label_val,label="Alberta SGER Increased ($30/t)",hjust=0.05,,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2017-01-01"), xend = ymd("2017-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+  
+  
+  annotate(geom = "text",x = ymd("2018-01-01"),y=label_val,label="Alberta adopts CCIR ($30/t)",hjust=0.05,,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2018-01-01"), xend = ymd("2018-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+ 
+  annotate(geom = "text",x = ymd("2020-01-01"),y=label_val,label="Alberta adopts TIER ($30/t)",hjust=0.05,size=2.5,angle=45)+
+  geom_segment(aes(x = ymd("2020-01-01"), xend = ymd("2020-01-01"), y = 0, yend = line_top,linetype = "Alberta Carbon Tax Changes"),size=.5)+
+ 
+  geom_segment(aes(x = ymd("2021-04-01"), xend = ymd("2021-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2021-04-01"),y=label_val,label="Federal Benchmark Increased ($40/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2022-04-01"), xend = ymd("2022-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2022-04-01"),y=label_val,label="Federal Benchmark Increased ($50/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2023-04-01"), xend = ymd("2023-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2023-04-01"),y=label_val,label="Federal Benchmark Increased ($65/t)",hjust=0.05,size=2.5,angle=45)+
+ 
+  geom_segment(aes(x = ymd("2024-04-01"), xend = ymd("2024-04-01"), y = 0, yend = line_top,linetype = "Federal Carbon Tax Changes"),size=.5)+
+  annotate(geom = "text",x = ymd("2024-04-01"),y=label_val,label="Federal Benchmark Increased ($80/t)",hjust=0.05,angle=45,size=2.5,angle=45)+
+ 
+  scale_linetype_manual("",values=c("22","22"),guide="none")
+
+```
