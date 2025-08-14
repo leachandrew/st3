@@ -207,6 +207,6 @@ gas_prod<-
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(gas_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
 gas_prod
 #if you want to create a png in normal code, use this
-ggsave(gas_prod,filename="gas_prod.png",width=12,height=6)
+ggsave(gas_prod,filename="gas_prod.png",width=12,height=6,dpi=300,bg="white")
 ```
 

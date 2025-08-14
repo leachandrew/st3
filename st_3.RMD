@@ -31,6 +31,7 @@ library(kableExtra) #nice tables in R Markdown
 library(curl) #use this for checking internet connections
 library(roll) #rolling means 
 library(ggsci)
+library(janitor)
 
 #unit conversions
 m3_bbl<-function(x) x*6.2898
@@ -338,7 +339,7 @@ all_crude_short<-ggplot(filter(all_production,year>=2015,product%in%graph_data)%
        title="Alberta Conventional Oil and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
-all_crude_short
+#all_crude_short
 
 all_crude_weekly<-ggplot(filter(all_production,product%in%graph_data))+
   geom_area(aes(date,6.2898*(production)/days_in_month(date)/10^6,group=product,fill=product))+
@@ -603,7 +604,7 @@ ggsave("appi.png",width = 8,height = 4,bg="white",dpi=300)
 
 
 
-```{r,fig.width=16,fig.height=8,dpi=300,eval=FALSE}
+```{r,fig.width=16,fig.height=8,dpi=300,eval=FALSE,include=FALSE}
 
 line_top<-4.2
 label_val<-4.3
@@ -648,5 +649,76 @@ all_crude+
   annotate(geom = "text",x = ymd("2024-04-01"),y=label_val,label="Federal Benchmark Increased ($80/t)",hjust=0.05,angle=45,size=2.5,angle=45)+
  
   scale_linetype_manual("",values=c("22","22"),guide="none")
+
+```
+
+### Annual Production History from ST-98 (mmbbl/d)
+
+```{r all_crude_st98, fig.width=14,fig.height=7,dpi=300,message=FALSE,warning=FALSE}
+
+#get longer history files from ST98
+
+
+#download.file("https://www.aer.ca/documents/sts/st98/2025/st98-2025-executive-summary-data.xlsx",mode="wb",dest="st98_exec.xlsx")
+energy_supply<-read_excel("st98_exec.xlsx",sheet="Figures",range="BR33:CD71")%>%slice(-1)%>%
+    mutate(
+    # First column to integer
+    across(1, as.integer),
+    # All other columns to numeric
+    across(-1, as.numeric)
+  )%>%
+  select(1,8:12) %>%
+  rename_with(~ str_remove(., "\\n.*"))%>%
+  rename_with(~ str_remove(., "\\r.*"))%>%
+  #clean_names()%>%
+  pivot_longer(-Year,values_to="production_mmbbld",names_to = "crude_stream")
+
+ggplot(energy_supply%>%
+         filter(Year<=2025)%>%
+          mutate(crude_stream=as_factor(crude_stream),
+                 crude_stream=fct_recode(crude_stream,"Pentanes Plus and Condensate"="Pentanes plus and condensate"),
+                 crude_stream=fct_recode(crude_stream,"Light and Medium Crude Oil"="Light and medium"),
+                 crude_stream=fct_recode(crude_stream,"Heavy Crude Oil"="Heavy"),
+                 crude_stream=fct_recode(crude_stream,"Upgraded Bitumen"="Upgraded bitumen"),
+                 crude_stream=fct_recode(crude_stream,"Nonupgraded Bitumen"="Nonupgraded bitumen"),
+                 crude_stream=fct_relevel(crude_stream,"Pentanes Plus and Condensate"),
+          )%>%
+         I()
+         )+
+  geom_area(aes(Year,production_mmbbld,group=crude_stream,fill=crude_stream),color="black", size=0.5)+
+  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
+  #scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(n=10))+
+  scale_x_continuous(expand = c(0,0),breaks=pretty_breaks(n=25))+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  guides(fill=guide_legend(nrow=1))+
+  expand_limits(y=5)+
+  #expand_limits(x=Sys.Date())+
+  theme(panel.border = element_blank(),
+        plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
+        axis.line.x = element_line(color = "gray"),
+        axis.line.y = element_line(color = "gray"),
+        axis.text = element_text(size = 12,),
+        axis.text.x = element_text(margin = margin(t = 10)),
+        axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title = element_text(size = 12),
+        #axis.label.x = element_text(size=20,vjust=+5),
+        plot.subtitle = element_text(size = 12,hjust=0.5),
+        plot.caption = element_text(face="italic",size = 12,hjust=0),
+        legend.key.width=unit(2,"line"),
+        legend.position = "bottom",
+        #legend.direction = "horizontal",
+        #legend.box = "horizontal",
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust=0.5,size = 14))+
+  labs(y="Oil and Bitumen Production (millions of barrels per day)",x=NULL,
+       title="Alberta Condensate, Conventional Oil, and Bitumen Production",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-98, graph by @andrew_leach",sep=""))
+
+
 
 ```
