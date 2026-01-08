@@ -506,6 +506,7 @@ oil_sands_plain
 all_crude_short
 ggsave(plot=all_crude_short,filename = "st3_oil_prod_short.png",width=16,height=7,dpi=300,bg="white")
 ```
+[Click here for high-resolution image](st3_oil_prod_short.png)
 
 
 ```{r all_crude_short, fig.width=14,fig.height=7,dpi=300}

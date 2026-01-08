@@ -1,5 +1,5 @@
 ---
-title: ST-3 Oil Production Data
+title: ST-3 Gas Production Data
 author: Andrew Leach
 date: <p>`r format(Sys.time(), '%B, %Y')`</p>
 output:
@@ -199,7 +199,7 @@ gas_prod<-
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
-  theme_ps_grid()+
+  theme_irpp()+
   #theme(legend.position = "none")+
   labs(y="Production (Million cubic meters per day)",x=NULL,
        title="Alberta Natural Gas Production",
