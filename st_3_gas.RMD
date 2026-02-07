@@ -187,15 +187,16 @@ With the data downloaded and compiled into a single file, with annual and quarte
 
 
 gas_prod<-
-  ggplot(filter(gas_production,year>=2015,product%in% c("Well Production","In Situ Well Production"))%>%
+  ggplot(filter(gas_production,product%in% c("Well Production","In Situ Well Production"))%>%
                     #mutate(product=fct_relevel(product,"Condensate Production"))
          I()
          )+
-  geom_area(aes(date,production/days_in_month(date)/10^3,group=product,fill=product),color="black", size=0.5)+
+  geom_area(aes(date,production/days_in_month(date)/10^3,fill=product),color="black", size=0.5,position="stack")+
   scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
   #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
   scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
-  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(),
+      sec.axis = sec_axis( trans=~.*0.035315, name="Production (Billion Cubic Feet per Day)"))+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+

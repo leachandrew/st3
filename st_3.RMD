@@ -194,22 +194,25 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
                                       #and now we're going to re-code some of the labels so that we make them common                                          #across the data we loaded
                                       mutate(
                                              product=fct_recode(product,
-                                                                "In Situ Bitumen Production"="In Situ Production",
-                                                                "Mined Bitumen Production"="Mined Production",
-                                                                "Non-Upgraded Bitumen Production"="Non-Upgraded Total",
-                                                                "Non-Upgraded Bitumen Production"="Nonupgraded Total",
-                                                                "Synthetic Crude Production"="Upgraded Production",
-                                                                "Conventional Oil Production"="Total Crude Oil Production",
-                                                                "Conventional Oil Production"="Total Conventional Oil Production"
+                                                                "In Situ Bitumen"="In Situ Production",
+                                                                "Mined Bitumen"="Mined Production",
+                                                                "Non-Upgraded Bitumen"="Non-Upgraded Total",
+                                                                "Non-Upgraded Bitumen"="Nonupgraded Total",
+                                                                "Synthetic Crude"="Upgraded Production",
+                                                                "Conventional Oil"="Total Crude Oil Production",
+                                                                "Conventional Oil"="Total Conventional Oil Production",
+                                                                "Total"="Total Production",
+                                                                "Total Oil Sands"="Total Oil Sands Production",
+                                                                "Condensate"="Condensate Production"
                                                                 ),
                                              #and we're going to sort them so that mined bitumen is last
-                                             product=fct_relevel(product,"Mined Bitumen Production",after=5))
+                                             product=fct_relevel(product,"Mined Bitumen",after=5))
  #last, we're going to collapse factors into on common level, so light and medium go into light, heavy and ultra-heavy 
  #are classified as heavy
   
   all_production <-all_production %>% mutate(product=fct_collapse(product,
-                        "Conventional Light Oil Production" = c("Crude Oil Light","Crude Oil Medium"),
-                        "Conventional Heavy Oil Production"= c("Crude Oil Heavy","Crude Oil Ultra Heavy")
+                        "Conventional Light Oil" = c("Crude Oil Light","Crude Oil Medium"),
+                        "Conventional Heavy Oil"= c("Crude Oil Heavy","Crude Oil Ultra Heavy")
                         )) %>% 
     #now, because for some rows we'll now have 2 entries for production from conventional light oil, for example, 
     # in a month, we have to collapse them
@@ -262,11 +265,11 @@ With the data downloaded and compiled into a single file, with annual and quarte
 
 ```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
 
-graph_data<-c("Conventional Light Oil Production","Conventional Heavy Oil Production","Condensate Production",
-               "In Situ Bitumen Production","Mined Bitumen Production")
+graph_data<-c("Conventional Light Oil","Conventional Heavy Oil","Condensate",
+               "In Situ Bitumen","Mined Bitumen")
 
 all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
-                    mutate(product=fct_relevel(product,"Condensate Production")))+
+                    mutate(product=fct_relevel(product,"Condensate")))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
   scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
   #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
@@ -306,7 +309,7 @@ all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
 #ggsave(all_crude,"oil_prod.png",width=12,height=6)
 
 all_crude_short<-ggplot(filter(all_production,year>=2015,product%in%graph_data)%>%
-                    mutate(product=fct_relevel(product,"Condensate Production")))+
+                    mutate(product=fct_relevel(product,"Condensate")))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
   scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
   #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
@@ -365,7 +368,7 @@ save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
 
 
 oil_sands<-
-  ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
+  ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil",product!="Conventional Heavy Oil",product!="Conventional Light Oil",product!="Condensate"))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
   #scale_fill_viridis("",discrete = T,option="A",direction = -1,end = .9)+
   scale_fill_manual("",values = pal_jco()(2),guide = "legend")+
@@ -403,8 +406,8 @@ oil_sands<-
 
 
 upgraded<-
-  all_production%>%filter(product%in%c("Non-Upgraded Bitumen Production","Conventional Heavy Oil Production","Conventional Light Oil Production","Synthetic Crude Production","Condensate Production"))%>%
-  mutate(product=factor(product,levels =c("Non-Upgraded Bitumen Production","Conventional Heavy Oil Production","Conventional Light Oil Production","Synthetic Crude Production","Condensate Production")),
+  all_production%>%filter(product%in%c("Non-Upgraded Bitumen","Conventional Heavy Oil","Conventional Light Oil","Synthetic Crude","Condensate"))%>%
+  mutate(product=factor(product,levels =c("Non-Upgraded Bitumen","Conventional Heavy Oil","Conventional Light Oil","Synthetic Crude","Condensate")),
          product=fct_rev(product)
          )%>%
   ggplot()+
@@ -447,7 +450,7 @@ upgraded<-
 ggsave(plot=upgraded,filename = "st3_oil_sands_upg.png",width=15,height=8,dpi=300,bg="white")
 
 
-oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil Production",product!="Conventional Heavy Oil Production",product!="Conventional Light Oil Production",product!="Condensate Production"))+
+oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="Total Conventional Oil",product!="Conventional Heavy Oil",product!="Conventional Light Oil",product!="Condensate"))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black",size=0.5)+
   scale_fill_manual("",values = grey.colors(n=3,end=0.85,start = 0.3),guide = "legend")+
   scale_x_date(date_breaks = "1 year",date_labels =  "%b\n%Y",,expand = c(0,0))+
@@ -511,6 +514,8 @@ ggsave(plot=all_crude_short,filename = "st3_oil_prod_short.png",width=16,height=
 
 ```{r all_crude_short, fig.width=14,fig.height=7,dpi=300}
 all_crude
+save(all_crude,file="../ab_budget/st3_prod.gph")
+
 ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg="white")
 ```
 [Click here for high-resolution image](st3_oil_prod.png)
@@ -525,7 +530,7 @@ upgraded
 
 ### Recent Production (mmbbl/d)
 ```{r, echo = T,eval=T}
-  all_production%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production"),date>=max(date)-years(1)) %>%
+  all_production%>%filter(product%in%c("Conventional Light Oil","Conventional Heavy Oil","Mined Bitumen","In Situ Bitumen","Total Oil Sands","Total"),date>=max(date)-years(1)) %>%
   select(product,date,production)%>%
   mutate(production=m3_bbl(production)/10^6/days_in_month(date),
          product=gsub(" Production","",product))%>%
@@ -544,7 +549,7 @@ upgraded
 ### Annual Production (mmbbl/d)
 
 ```{r, echo = T,eval=T}
-  annual%>%filter(product%in%c("Conventional Light Oil Production","Conventional Heavy Oil Production","Mined Bitumen Production","In Situ Bitumen Production","Total Production")) %>%
+  annual%>%filter(product%in%c("Conventional Light Oil","Conventional Heavy Oil","Mined Bitumen","In Situ Bitumen","Total Oil Sands","Total")) %>%
   mutate(production=m3_bbl(production)/10^6/days,
          product=gsub(" Production","",product))%>%select(-yoy_growth)%>%pivot_wider(names_from=product,values_from = production)%>%
   rename(Year=year)%>%
