@@ -57,6 +57,70 @@ colors_tableau10_medium <- function()
   return(c("#729ECE", "#FF9E4A", "#67BF5C", "#ED665D", "#AD8BC9", "#A8786E",
            "#ED97CA", "#A2A2A2", "#CDCC5D", "#6DCCDA"))
 }
+
+library(ggplot2)
+
+# 1. Define the specific colours based on the Alberta Flag
+# Blue: Official "Alberta Blue" (Background/Sky)
+# Gold: Official "Alberta Gold" (Wheat fields)
+# Green: Foothills and forests
+# Red: St. George's Cross
+# White: Snow caps and Cross background
+# Grey: Rocky Mountains
+
+alberta_colors <- c(
+  blue  = "#0D3692", 
+  gold  = "#FEBA35", 
+  green = "#0D6826", 
+  red   = "#FC1921", 
+  white = "#FFFFFF",
+  grey  = "#BDBDBD"
+)
+
+# 2. Function to extract colours by name
+# Usage: alberta_cols("blue", "gold")
+alberta_cols <- function(...) {
+  cols <- c(...)
+  if (is.null(cols))
+    return (alberta_colors)
+  alberta_colors[cols]
+}
+
+# 3. Create the Palette Function
+# This allows you to select specific sub-palettes (e.g., "main" or "nature")
+alberta_palettes <- list(
+  `main`  = alberta_cols("blue", "gold", "green", "red"),
+  `nature` = alberta_cols("blue", "grey", "green", "gold"),
+  `full`  = alberta_cols("blue", "gold", "green", "red", "grey", "white")
+)
+
+alberta_pal <- function(palette = "main", reverse = FALSE, ...) {
+  pal <- alberta_palettes[[palette]]
+  if (reverse) pal <- rev(pal)
+  colorRampPalette(pal, ...)
+}
+
+# 4. Create ggplot2 Scale Functions
+# Scale for Fill
+scale_fill_alberta <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- alberta_pal(palette = palette, reverse = reverse)
+  if (discrete) {
+    discrete_scale("fill", paste0("alberta_", palette), palette = pal, ...)
+  } else {
+    scale_fill_gradientn(colours = pal(256), ...)
+  }
+}
+
+# Scale for Colour
+scale_color_alberta <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- alberta_pal(palette = palette, reverse = reverse)
+  if (discrete) {
+    discrete_scale("colour", paste0("alberta_", palette), palette = pal, ...)
+  } else {
+    scale_color_gradientn(colours = pal(256), ...)
+  }
+}
+
 #basic graph theme
 weekly_small<-function(caption_align=1){
   theme_minimal()+theme(
@@ -84,9 +148,9 @@ Once you've got the preliminaries of the code, downloading the data is fairly ea
 #I'm going to make a function here so that I can specify whether I want to download all/none/new
 
 st_3_online<-
-download<-"all"
+download<-"new"
 data_store <- list()
-years<-seq(2010,2016)
+years<-seq(2025,2016)
 i<-1
   filename<-paste("Gas_2010-2016.xlsx",sep="")
   if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
