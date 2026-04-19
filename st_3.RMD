@@ -679,7 +679,7 @@ energy_supply<-read_excel("st98_exec.xlsx",sheet="Figures",range="BR33:CD71")%>%
   #clean_names()%>%
   pivot_longer(-Year,values_to="production_mmbbld",names_to = "crude_stream")
 
-ggplot(energy_supply%>%
+st_98<-ggplot(energy_supply%>%
          filter(Year<=2025)%>%
           mutate(crude_stream=as_factor(crude_stream),
                  crude_stream=fct_recode(crude_stream,"Pentanes Plus and Condensate"="Pentanes plus and condensate"),
@@ -725,6 +725,8 @@ ggplot(energy_supply%>%
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-98, graph by @andrew_leach",sep=""))
 
+save(st_98,file="../ab_budget/st98_prod.gph")
 
+st_98
 
 ```
