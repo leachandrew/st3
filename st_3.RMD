@@ -83,7 +83,7 @@ Once you've got the preliminaries of the code, downloading the data is fairly ea
 ```{r st3_data, cache=FALSE,warning=FALSE,message=FALSE} 
 #I'm going to make a function here so that I can specify whether I want to download all/none/new
 
-st_3_online<-function(download="all"){
+st_3_online<-function(download="none"){
    #every year is xlss file which makes it easy
 #specify the rows we're going to want
 #keep_rows<-c("Crude Oil Light",  "Crude Oil Medium",
@@ -126,10 +126,12 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   }
   #let's get 2017-2020 data - same process, but they are in seperate files
   #https://static.aer.ca/prd/documents/sts/st3/ST3_2021-12_Oil.xlsx
-  years<-seq(2017,2024)
+  years<-seq(2017,2025)
   #year<-2023
   for(year in years){ #loop over 2017-2020
     filename<-paste("Oil_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(year==2025)
+        filename<-"Oil_2025.xlsx"
     if(year==2024)
         filename<-"ST3_Oil_2024.xlsx"
     if(year==2023)
@@ -147,6 +149,10 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
           if(!file.exists(filename))
             if(year==2024)
             download.file("https://www.aer.ca/2025-02/ST3_Oil_2024.xlsx",filename,mode="wb")
+      if(has_internet()) #if you're connected, go get the file
+          if(!file.exists(filename))
+            if(year==2025)
+            download.file("https://www.aer.ca/prd/documents/sts/st3/Oil_2025.xlsx",filename,mode="wb")
     production_data <- read_excel(filename, sheet = "Data", skip = 4)
     names(production_data)[1]<-"product"
     production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
@@ -165,7 +171,7 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   if(has_internet()) #if you're connected, go get the file
           download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
   production_data <- read_excel(filename, sheet = "Data", skip = 4)
-  year<-2025
+  year<-2026
   names(production_data)[1]<-"product"
   production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
   mutate(across(-1, as.numeric))
@@ -238,7 +244,7 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   
 }
 
-all_production<-st_3_online(download = "all") #call the function we just made to get the data
+all_production<-st_3_online(download = "none") #call the function we just made to get the data
 
 #create an annual data set using group_by and summarize
   
@@ -362,7 +368,7 @@ all_crude_weekly<-ggplot(filter(all_production,product%in%graph_data))+
   weekly_graphs()
 #if you want to create a png in normal code, use this
 
-save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
+#save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
 
 #ggsave(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
 
@@ -514,7 +520,7 @@ ggsave(plot=all_crude_short,filename = "st3_oil_prod_short.png",width=16,height=
 
 ```{r all_crude_short, fig.width=14,fig.height=7,dpi=300}
 all_crude
-save(all_crude,file="../ab_budget/st3_prod.gph")
+#save(all_crude,file="../ab_budget/st3_prod.gph")
 
 ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg="white")
 ```
