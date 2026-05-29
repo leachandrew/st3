@@ -32,6 +32,7 @@ library(curl) #use this for checking internet connections
 library(roll) #rolling means 
 library(ggsci)
 library(janitor)
+library(httr)
 
 #unit conversions
 m3_bbl<-function(x) x*6.2898
@@ -74,6 +75,22 @@ weekly_small<-function(caption_align=1){
   )
 }
 
+download_forbidden_file <- function(url, destfile,refer="https://www.aer.ca/") {
+  headers <- c(
+    "User-Agent" = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Referer" = refer
+  )
+  r <- GET(
+    url,
+    add_headers(.headers = headers)
+  )
+  stop_for_status(r)
+  writeBin(
+    content(r, "raw"),
+    destfile
+  )
+  invisible(destfile)
+}
 ```
 
 # Download the Data
@@ -86,7 +103,8 @@ Once you've got the preliminaries of the code, downloading the data is fairly ea
 st_3_online<-function(download="none"){
    #every year is xlss file which makes it easy
 #specify the rows we're going to want
-#keep_rows<-c("Crude Oil Light",  "Crude Oil Medium",
+#download="none"
+  #keep_rows<-c("Crude Oil Light",  "Crude Oil Medium",
 #             "Crude Oil Heavy","Crude Oil Ultra Heavy","Total Conventional Oil Production","Crude Oil Ultra-Heavy",
 #             "Condensate Production","In Situ Production","Mined Production",
 #             "Non-Upgraded Total","Upgraded Production","Total Oil Sands Production",
@@ -144,15 +162,15 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
         if(has_internet()) #if you're connected, go get the file
           if(!file.exists(filename))
             if(year!=2024)
-            download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+            download_forbidden_file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename)
     if(has_internet()) #if you're connected, go get the file
           if(!file.exists(filename))
             if(year==2024)
-            download.file("https://www.aer.ca/2025-02/ST3_Oil_2024.xlsx",filename,mode="wb")
+            download_forbidden_file("https://www.aer.ca/2025-02/ST3_Oil_2024.xlsx",filename,mode="wb")
       if(has_internet()) #if you're connected, go get the file
           if(!file.exists(filename))
             if(year==2025)
-            download.file("https://www.aer.ca/prd/documents/sts/st3/Oil_2025.xlsx",filename,mode="wb")
+            download_forbidden_file("https://www.aer.ca/prd/documents/sts/st3/Oil_2025.xlsx",filename)
     production_data <- read_excel(filename, sheet = "Data", skip = 4)
     names(production_data)[1]<-"product"
     production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
@@ -164,12 +182,17 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
     data_store[[i]]<-production_data
     i<-i+1
   }
-  #Most recent data are stored as "current"  
-  year<-"Current"
-  filename<-paste("Oil_current.xlsx",sep="")
+  #Most recent data are stored as "current"
+  filename<-"Oil_current.xlsx"
+  #download.file("https://www.aer.ca/documents/sts/st3/Oil_current.xlsx",destfile=filename,mode="wb")
+url<-"https://www.aer.ca/documents/sts/st3/Oil_current.xlsx"
+download_forbidden_file(url,  filename,refer="https://www.aer.ca/")
+
+# then manually trigger download or extract via browser context
   #check for interne
-  if(has_internet()) #if you're connected, go get the file
-          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
+#  if(has_internet()) #if you're connected, go get the file
+#      download.file("https://www.aer.ca/documents/sts/st3/Oil_current.pdf",filename,mode="wb")  
+      #download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
   production_data <- read_excel(filename, sheet = "Data", skip = 4)
   year<-2026
   names(production_data)[1]<-"product"
@@ -308,7 +331,7 @@ all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
        title="Alberta Conventional Oil and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
-
+#all_crude
 
 
 #if you want to create a png in normal code, use this
@@ -407,8 +430,8 @@ oil_sands<-
         plot.title = element_text(hjust=0.5,size = 14))+
   labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
        title="Alberta Oil Sands Bitumen Production",
-       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""),
-       NULL)
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""))
+#oil_sands
 
 
 upgraded<-
@@ -449,8 +472,7 @@ upgraded<-
         plot.title = element_text(hjust=0.5,size = 14))+
   labs(y="Oil Production (millions of barrels per day)",x=NULL,
        title="Alberta Oil Production",
-       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""),
-       NULL)
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""))
 
 #if you want to create a png in normal code, use this
 ggsave(plot=upgraded,filename = "st3_oil_sands_upg.png",width=15,height=8,dpi=300,bg="white")
@@ -486,10 +508,9 @@ oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="To
         #legend.box = "horizontal",
         legend.text = element_text(size = 12),
         plot.title = element_text(hjust=0.5,size = 14))+
-  labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
+  labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL)
        #title="Alberta Oil Sands Bitumen Production",
-       #caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph #by @andrew_leach",sep=""),
-       NULL)
+       #caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph #by @andrew_leach",sep=""))
 
 
 #if you want to create a png in normal code, use this
