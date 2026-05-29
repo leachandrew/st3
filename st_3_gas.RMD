@@ -26,9 +26,9 @@ library(knitr) #using this to make the html document
 library(prettydoc) #nice tables in the html doc
 library(zoo) #time series data
 library(viridis) #color-blind friendly palettes for graphs
-library(patchwork) #allows you to combine plots
 library(kableExtra) #nice tables in R Markdown
 library(curl) #use this for checking internet connections
+library(httr)
 library(roll) #rolling means 
 library(ggsci)
 library(cowplot)
@@ -121,21 +121,21 @@ scale_color_alberta <- function(palette = "main", discrete = TRUE, reverse = FAL
   }
 }
 
-#basic graph theme
-weekly_small<-function(caption_align=1){
-  theme_minimal()+theme(
-    plot.margin = margin(.25, .75, .25, .75, "cm"),
-    legend.position = "bottom",
-    legend.margin=margin(c(0,0,0,0),unit="cm"),
-    legend.text = element_text(colour="black", size = 9),
-    plot.caption = element_text(size = 9, face = "italic",hjust=caption_align),
-    plot.title = element_text(size = 12,face = "bold"),
-    plot.subtitle = element_text(size = 11, face = "italic"),
-    panel.grid.minor = element_blank(),
-    text = element_text(size = 11,face = "bold"),
-    axis.title.x = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 15, b = 0)),
-    axis.text = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 10, b = 10)),
+download_forbidden_file <- function(url, destfile,refer="https://www.aer.ca/") {
+  headers <- c(
+    "User-Agent" = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Referer" = refer
   )
+  r <- GET(
+    url,
+    add_headers(.headers = headers)
+  )
+  stop_for_status(r)
+  writeBin(
+    content(r, "raw"),
+    destfile
+  )
+  invisible(destfile)
 }
 
 ```
@@ -150,20 +150,14 @@ Once you've got the preliminaries of the code, downloading the data is fairly ea
 st_3_online<-
 download<-"new"
 data_store <- list()
-years<-seq(2025,2016)
+
 i<-1
-  filename<-paste("Gas_2010-2016.xlsx",sep="")
-  if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
-        if(has_internet()) #if you're connected, go get the file
-          if(!file.exists(filename))
-          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
-#year<-2010 #testing
+years<-seq(2010,2016)
+filename="Gas_2010-2016.xlsx"
 for(year in years){ #loop over 2010-2016, but the data are stored in different sheets
   production_data <- read_excel(filename, sheet = as.character(year), skip = 4)
   #the sheets are a bit of a mess, so we need to clean them up
   names(production_data)[1]<-"product" #name column 1
-  # the %>% or pipeline is basically a  "pass to" command
-  # start with production data, pass to select and remove cols 2 and 15, pass to filter and keep and rows with
   # the names in the keep_rows object we created above
   production_data<-production_data %>% select(-2,-15)%>% #%>% filter(product %in% keep_rows)
   filter(!is.na(product),!is.na(Jan))%>%
@@ -181,12 +175,13 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   #step your list counter one unit
   i<-i+1
   }
-  #let's get 2017-2020 data - same process, but they are in seperate files
+  #let's get 2017-2025 data - same process, but they are in seperate files
   #https://static.aer.ca/prd/documents/sts/st3/ST3_2021-12_Oil.xlsx
-  years<-seq(2017,2024)
-  #year<-2023
-  for(year in years){ #loop over 2017-2020
+  years<-seq(2017,2025)
+  for(year in years){ #loop over 2017-2025
     filename<-paste("Gas_",year,".xlsx",sep="") #use paste to put the year into the filename
+    if(year==2024)
+        filename<-"ST3_Gas_2025.xlsx"
     if(year==2024)
         filename<-"ST3_Gas_2024.xlsx"
     if(year==2023)
@@ -195,15 +190,6 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
         filename<-"ST3_2022-12_Gas.xlsx"
     if(year==2021)
         filename<-"ST3_2021-12_Gas.xlsx"
-    if(tolower(download)=="all")#if you chose to download the old data. correct case errors in case someone sends "ALL"
-        if(has_internet()) #if you're connected, go get the file
-          if(!file.exists(filename))
-            if(year!=2024)
-            download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
-    if(has_internet()) #if you're connected, go get the file
-          if(!file.exists(filename))
-            if(year==2024)
-            download.file("https://www.aer.ca/2025-02/ST3_Gas_2024.xlsx",filename,mode="wb")
     production_data <- read_excel(filename, sheet = "Data", skip = 4)
     names(production_data)[1]<-"product"
     production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
@@ -220,9 +206,9 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
   filename<-paste("Gas_current.xlsx",sep="")
   #check for interne
   if(has_internet()) #if you're connected, go get the file
-          download.file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename,mode="wb")
-  production_data <- read_excel(filename, sheet = "Data", skip = 4)
-  year<-2025
+          download_forbidden_file(paste("https://www.aer.ca/documents/sts/st3/",filename,sep=""),filename)
+  production_data <- read_excel(filename, sheet = "Gas", skip = 4)
+  year<-2026
   names(production_data)[1]<-"product"
   production_data<-production_data %>% select(-2,-15) %>% filter(!is.na(product),!is.na(Jan))%>%
   mutate(across(-1, as.numeric))
@@ -248,11 +234,13 @@ With the data downloaded and compiled into a single file, with annual and quarte
 
 
 ```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
-
-
 gas_prod<-
-  ggplot(filter(gas_production,product%in% c("Well Production","In Situ Well Production"))%>%
-                    #mutate(product=fct_relevel(product,"Condensate Production"))
+  ggplot(filter(gas_production,product%in% c("Well Production","In Situ Well Production","Oil Sands Facility Production","Raw Gas Imports","Total Receipts",
+                                             "Total Field Gas Use","Total Processed Gas Use"))%>%
+                    mutate(production=production*ifelse(product=="Total Processed Gas Use",-1,1),
+                           production=production*ifelse(product=="Total Field Gas Use",-1,1),
+                           product=as_factor(product)
+                           )%>%
          I()
          )+
   geom_area(aes(date,production/days_in_month(date)/10^3,fill=product),color="black", size=0.5,position="stack")+
@@ -264,14 +252,152 @@ gas_prod<-
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
-  theme_irpp()+
+  theme_irpp(base_size = 18)+
   #theme(legend.position = "none")+
-  labs(y="Production (Million cubic meters per day)",x=NULL,
-       title="Alberta Natural Gas Production",
+  labs(y="Supply (Million cubic meters per day)",x=NULL,
+       title="Alberta Natural Gas Supply",
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(gas_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
-gas_prod
+#gas_prod
 #if you want to create a png in normal code, use this
 ggsave(gas_prod,filename="gas_prod.png",width=12,height=6,dpi=300,bg="white")
+
+
+palette_ng <- c(
+  "Alberta Use"   = "#0057B8",  # strong Alberta blue
+  "Other Canadian Provinces"= "#FF0000",
+  "British Columbia" = "#E3B505",  # warm gold
+  "Saskatchewan"     = "#8C8C8C",  # neutral grey
+  "Manitoba"         = "#C44E52",  # muted red
+  "Ontario"          = "#6B9FE3",  # soft blue
+  "Quebec"           = "#003049",  # deep navy
+
+  "Maritimes"        = "#B08900",  # muted mustard
+  "United States"= "#3C3B6E",
+  "US Midwest"       = "#A11D21",  # darker red
+  "US East Coast"    = "#2E2E2E",  # charcoal
+  "US Gulf Coast"    = "#405C8A",  # slate blue
+  "US Rockies"       = "#D9D9D9",  # light grey
+  "US West Coast"    = "#F2F2F2"   # near white
+)
+
+gas_disp<-
+  ggplot(filter(gas_production,product%in% c("Total Alberta Use",
+"British Columbia",
+"Saskatchewan",
+"Manitoba",
+"Ontario",
+"Quebec",
+"Maritimes",
+"NWT Yukon Nunavut",
+"PADD1",
+"PADD2",
+"PADD3",
+"PADD4",
+"PADD5"))%>%
+        rename("loc"=product)%>%
+          mutate(loc=as_factor(loc),
+            loc=fct_recode(loc,"US East Coast"="PADD1"),
+            loc=fct_recode(loc,"US West Coast"="PADD5"),
+            loc=fct_recode(loc,"US Gulf Coast"="PADD3"),
+            loc=fct_recode(loc,"US Rockies"="PADD4"),
+            loc=fct_recode(loc,"US Midwest"="PADD2"),
+            loc=fct_recode(loc,"Alberta Use"="Total Alberta Use"),
+            loc=fct_recode(loc,"Territories"="NWT Yukon Nunavut"),
+            loc=fct_relevel(loc,"Alberta Use",after = Inf)
+            
+            )%>%
+         I()
+         )+
+  geom_area(aes(date,production/days_in_month(date)/10^3,fill=loc),color="black", size=0.5,position="stack")+
+  scale_fill_manual("",values = palette_ng)+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(),
+      sec.axis = sec_axis( trans=~.*0.035315, name="Disposition (Billion Cubic Feet per Day)"))+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #expand_limits(y=4.5)+
+  expand_limits(x=Sys.Date())+
+ theme_irpp(base_size = 18)+
+  guides(
+  fill = guide_legend(
+    nrow = 3,
+    byrow = TRUE
+  )
+)+
+  #theme(legend.position = "none")+
+  labs(y="Disposition (Million cubic meters per day)",x=NULL,
+       title="Alberta Natural Gas Disposition",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(gas_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
+#gas_disp
+#if you want to create a png in normal code, use this
+ggsave(gas_disp,filename="gas_disp.png",width=12,height=6,dpi=300,bg="white")
+
+
+gas_disp_brief<-
+  ggplot(filter(gas_production,product%in% c("Total Alberta Use",
+"Total Other Canada Removals",
+"Total USA Removals"))%>%
+        rename("loc"=product)%>%
+          mutate(loc=as_factor(loc),
+            loc=fct_recode(loc,"Alberta Use"="Total Alberta Use"),
+            loc=fct_recode(loc,"United States"="Total USA Removals"),
+            loc=fct_recode(loc,"Other Canadian Provinces"="Total Other Canada Removals"),
+            loc=fct_relevel(loc,"Alberta Use",after = Inf)
+            
+            )%>%
+         I()
+         )+
+  geom_area(aes(date,production/days_in_month(date)/10^3,fill=loc),color="black", size=0.5,position="stack")+
+  scale_fill_manual("",values = palette_ng)+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(),
+      sec.axis = sec_axis( trans=~.*0.035315, name="Disposition (Billion Cubic Feet per Day)"))+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  #expand_limits(y=4.5)+
+  expand_limits(x=Sys.Date())+
+  theme_irpp(base_size = 18)+
+  guides(
+  fill = guide_legend(
+    nrow = 1,
+    byrow = TRUE
+  )
+)+
+  #theme(legend.position = "none")+
+  labs(y="Disposition (Million cubic meters per day)",x=NULL,
+       title="Alberta Natural Gas Disposition",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(gas_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
+#gas_disp_brief
+#if you want to create a png in normal code, use this
+ggsave(gas_disp_brief,filename="gas_disp_brief.png",width=12,height=6,dpi=300,bg="white")
+
+
+
 ```
+### Alberta Gas Supply
+
+```{r gas_prod, fig.width=15, fig.height=8,dpi=300,warning=F,message=F}
+gas_prod
+```
+[Click here for high-resolution image](gas_prod.png)
+
+### Alberta Gas Disposition
+
+
+```{r gas_disp_brief, fig.width=15, fig.height=8,dpi=300,warning=F,message=F}
+gas_disp_brief
+```
+[Click here for high-resolution image](gas_disp_brief.png)
+
+
+
+
+```{r gas_dispo, fig.width=15, fig.height=8,dpi=300,warning=F,message=F}
+gas_disp
+```
+[Click here for high-resolution image](gas_disp.png)
+
 
