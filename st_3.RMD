@@ -58,22 +58,6 @@ colors_tableau10_medium <- function()
   return(c("#729ECE", "#FF9E4A", "#67BF5C", "#ED665D", "#AD8BC9", "#A8786E",
            "#ED97CA", "#A2A2A2", "#CDCC5D", "#6DCCDA"))
 }
-#basic graph theme
-weekly_small<-function(caption_align=1){
-  theme_minimal()+theme(
-    plot.margin = margin(.25, .75, .25, .75, "cm"),
-    legend.position = "bottom",
-    legend.margin=margin(c(0,0,0,0),unit="cm"),
-    legend.text = element_text(colour="black", size = 9),
-    plot.caption = element_text(size = 9, face = "italic",hjust=caption_align),
-    plot.title = element_text(size = 12,face = "bold"),
-    plot.subtitle = element_text(size = 11, face = "italic"),
-    panel.grid.minor = element_blank(),
-    text = element_text(size = 11,face = "bold"),
-    axis.title.x = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 15, b = 0)),
-    axis.text = element_text(size = 11,face = "bold", colour="black",margin = margin(t = 10, b = 10)),
-  )
-}
 
 download_forbidden_file <- function(url, destfile,refer="https://www.aer.ca/") {
   headers <- c(
@@ -180,13 +164,20 @@ for(year in years){ #loop over 2010-2016, but the data are stored in different s
     production_data<-production_data %>% pivot_longer(cols=-c("product","annual","year"),
                                               names_to="month",values_to = "production")
     data_store[[i]]<-production_data
+    
+    
+    
     i<-i+1
   }
   #Most recent data are stored as "current"
   filename<-"Oil_current.xlsx"
   #download.file("https://www.aer.ca/documents/sts/st3/Oil_current.xlsx",destfile=filename,mode="wb")
 url<-"https://www.aer.ca/documents/sts/st3/Oil_current.xlsx"
-download_forbidden_file(url,  filename,refer="https://www.aer.ca/")
+
+needs_refresh <- !file.exists(filename) ||
+  difftime(Sys.time(), file.info(filename)$mtime, units = "hours") > 24
+if(needs_refresh)
+  download_forbidden_file(url,  filename,refer="https://www.aer.ca/")
 
 # then manually trigger download or extract via browser context
   #check for interne
@@ -289,10 +280,36 @@ all_production<-st_3_online(download = "none") #call the function we just made t
     mutate(q_lasty=round((production-lag(production,4))/lag(production,4)*100,2))
 ```
 
+
+
+
+
 With the data downloaded and compiled into a single file, with annual and quarterly subfiles, we can graph some data.
 
 
 ```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
+
+dispo<-
+  ggplot(filter(all_production,product%in%c("Total Alberta Use","Removals from Alberta")))+
+  geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
+  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
+  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
+  scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
+  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  guides(fill=guide_legend(nrow=1))+
+  expand_limits(y=4.5)+
+  expand_limits(x=Sys.Date())+
+  theme_irpp(base_size = 16)+
+  labs(y="Oil and Bitumen Disposition (Millions of barrels per day)",x=NULL,
+       title="Alberta Conventional Oil and Bitumen Disposition",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
+#dispo
+
+ggsave(plot=dispo,filename = "st3_dispo.png",width=12,height=6,dpi=300,bg="white")
+
+
 
 graph_data<-c("Conventional Light Oil","Conventional Heavy Oil","Condensate",
                "In Situ Bitumen","Mined Bitumen")
@@ -308,25 +325,7 @@ all_crude<-ggplot(filter(all_production,product%in%graph_data)%>%
   guides(fill=guide_legend(nrow=1))+
   expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
-  theme(panel.border = element_blank(),
-        plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+  theme_irpp(base_size = 16)+
   labs(y="Oil and Bitumen Production (Millions of barrels per day)",x=NULL,
        title="Alberta Conventional Oil and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
@@ -348,25 +347,7 @@ all_crude_short<-ggplot(filter(all_production,year>=2015,product%in%graph_data)%
   guides(fill=guide_legend(nrow=1))+
   expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
-  theme(panel.border = element_blank(),
-        plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+  theme_irpp(base_size = 16)+
   labs(y="Oil and Bitumen Production (Millions of barrels per day)",x=NULL,
        title="Alberta Conventional Oil and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
@@ -388,7 +369,7 @@ all_crude_weekly<-ggplot(filter(all_production,product%in%graph_data))+
        title="Alberta Conventional Oil and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))+
-  weekly_graphs()
+  theme_irpp(base_size = 16)
 #if you want to create a png in normal code, use this
 
 #save(all_crude_weekly,file="../weekly_charts/st3_prod.gph")
@@ -406,28 +387,9 @@ oil_sands<-
   expand_limits(y=4)+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #guides(fill=FALSE,colour=FALSE)+
-  theme_classic() +
   expand_limits(x=Sys.Date())+
   guides(fill=guide_legend(nrow=1))+
-  theme(plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
-        panel.border = element_blank(),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+  theme_irpp(base_size = 16)+
   labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL,
        title="Alberta Oil Sands Bitumen Production",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""))
@@ -448,28 +410,9 @@ upgraded<-
   expand_limits(y=4)+
   #scale_colour_manual("",values=my_palette,guide = "legend")+
   #guides(fill=FALSE,colour=FALSE)+
-  theme_classic() +
   expand_limits(x=Sys.Date())+
   guides(fill=guide_legend(nrow=1))+
-  theme(plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
-        panel.border = element_blank(),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+  theme_irpp(base_size = 16)+
   labs(y="Oil Production (millions of barrels per day)",x=NULL,
        title="Alberta Oil Production",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph by @andrew_leach",sep=""))
@@ -484,30 +427,9 @@ oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="To
   scale_x_date(date_breaks = "1 year",date_labels =  "%b\n%Y",,expand = c(0,0))+
   scale_y_continuous(expand = c(0,0),breaks=pretty_breaks())+
   expand_limits(y=4)+
-  #scale_colour_manual("",values=my_palette,guide = "legend")+
-  #guides(fill=FALSE,colour=FALSE)+
-  theme_classic() +
   expand_limits(x=Sys.Date(),y=4.4)+
   guides(fill=guide_legend(nrow=1))+
-  theme(plot.margin=margin(t = 0, r = 15, b = 0, l = 0, unit = "pt"),
-        panel.border = element_blank(),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+  theme_irpp(base_size = 16)+
   labs(y="Oil Sands Bitumen Production (millions of barrels per day)",x=NULL)
        #title="Alberta Oil Sands Bitumen Production",
        #caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph #by @andrew_leach",sep=""))
@@ -552,6 +474,14 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
 upgraded
 ```
 [Click here for high-resolution image](st3_oil_sands_upg.png)
+
+### Crude oil and bitumen disposition
+
+
+```{r oil_dispo, fig.width=15, fig.height=8,dpi=300}
+dispo
+```
+[Click here for high-resolution image](st3_dispo.png)
 
 
 
@@ -610,20 +540,10 @@ all_production%>%
   
   scale_fill_manual("",values=colors_tableau10())+
   scale_x_date(date_breaks = "1 year",date_labels = "%Y",expand=c(0,0))+
-  theme_minimal()+
   scale_y_continuous(breaks = pretty_breaks(n=8),expand=c(0,0))+
   expand_limits(y=c(0,160))+
   #guides(fill = guide_legend(nrow = 3))+
-  theme(
-    #legend.position = "none",
-    panel.grid.minor = element_blank(),
-    panel.grid.major.x = element_blank(),
-    legend.margin=margin(c(0,0,0,0),unit="cm"),
-    axis.text.x = element_text(margin=margin(c(.3,.1,.1,.1),unit="cm")),
-    legend.text = element_text(colour="black", size = 8, face = "bold"),
-    plot.caption=element_text(hjust = 0,size=7),
-    plot.title=element_text(hjust = 0,size=18)
-    )+
+  theme_irpp(base_size = 16)+
   labs(x="",y=paste("Index Value (",base_year,"=100)",sep=""),
        title="APPI Before and After Carbon Pricing",
        #subtitle="Canadian Refinery Production",
@@ -720,33 +640,11 @@ st_98<-ggplot(energy_supply%>%
          )+
   geom_area(aes(Year,production_mmbbld,group=crude_stream,fill=crude_stream),color="black", size=0.5)+
   scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
-  #scale_fill_viridis("",discrete = T,option="F",direction = -1,end = .9)+
-  #scale_x_date(date_breaks = "1 year",date_labels =  "%Y",expand = c(0,0))+
   scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(n=10))+
-  scale_x_continuous(expand = c(0,0),breaks=pretty_breaks(n=25))+
-  #scale_colour_manual("",values=my_palette,guide = "legend")+
+  scale_x_continuous(expand = c(0,0),breaks=pretty_breaks(n=15))+
   guides(fill=guide_legend(nrow=1))+
   expand_limits(y=5)+
-  #expand_limits(x=Sys.Date())+
-  theme(panel.border = element_blank(),
-        plot.margin=margin(t = 5, r = 15, b = 5, l = 5, unit = "pt"),
-        panel.grid = element_blank(),
-        panel.grid.major.y = element_line(color = "gray",linetype="dotted"),
-        axis.line.x = element_line(color = "gray"),
-        axis.line.y = element_line(color = "gray"),
-        axis.text = element_text(size = 12,),
-        axis.text.x = element_text(margin = margin(t = 10)),
-        axis.title.y = element_text(margin = margin(r = 10)),
-        axis.title = element_text(size = 12),
-        #axis.label.x = element_text(size=20,vjust=+5),
-        plot.subtitle = element_text(size = 12,hjust=0.5),
-        plot.caption = element_text(face="italic",size = 12,hjust=0),
-        legend.key.width=unit(2,"line"),
-        legend.position = "bottom",
-        #legend.direction = "horizontal",
-        #legend.box = "horizontal",
-        legend.text = element_text(size = 12),
-        plot.title = element_text(hjust=0.5,size = 14))+
+theme_irpp(base_size = 16)+
   labs(y="Oil and Bitumen Production (millions of barrels per day)",x=NULL,
        title="Alberta Condensate, Conventional Oil, and Bitumen Production",
        #subtitle="For Operators with Production above 25k bbl/d",
