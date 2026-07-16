@@ -205,7 +205,7 @@ if(needs_refresh)
   all_production<-all_production %>% mutate(production=as.numeric(production),
                                             date=ymd(paste(year,as.character(month),1,sep="-")))
          
-
+  save(all_production,file = "st3_oil.rdata")
   #next part is working with factors. Factors basically store data as a numeric code or level (1,2,3,4) and a
   #set of labels attached to the levels
   
@@ -259,7 +259,7 @@ if(needs_refresh)
 }
 
 all_production<-st_3_online(download = "none") #call the function we just made to get the data
-
+save(all_production,file = "st3_oil.rdata")
 #create an annual data set using group_by and summarize
   
   annual<-all_production %>% 
@@ -301,13 +301,14 @@ dispo<-
   expand_limits(y=4.5)+
   expand_limits(x=Sys.Date())+
   theme_irpp(base_size = 16)+
+  rotate_x()+
   labs(y="Oil and Bitumen Disposition (Millions of barrels per day)",x=NULL,
        title="Alberta Conventional Oil and Bitumen Disposition",
        #subtitle="For Operators with Production above 25k bbl/d",
        caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B, %Y")  ,", graph by @andrew_leach",sep=""))
 #dispo
 
-ggsave(plot=dispo,filename = "st3_dispo.png",width=12,height=6,dpi=300,bg="white")
+ggsave(plot=dispo,filename = "st3_dispo.png",width=11,height=6.5,dpi=300,bg="white")
 
 
 
