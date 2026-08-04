@@ -12,9 +12,7 @@ output:
 editor: source
 ---
 
-The Alberta Energy Regulator (AER) provides monthly data for oil production in Alberta, including from the oil sands region in a report known as the ST-3.  The data are available [here](https://www.aer.ca/providing-information/data-and-reports/statistical-reports/st3), and you can either download the data and analyze it yourself or use the embedded R code below to download all the data. 
-
-This page is also an easy introduction for downloading and manipulating data in R. If you're going to run the R code, you'll need a few basic set-up elements to get everything to work. I've included the code here for your reference.
+The Alberta Energy Regulator (AER) provides monthly data for oil production in Alberta, including from the oil sands region in a report known as the ST-3.  The data are available [here](https://www.aer.ca/providing-information/data-and-reports/statistical-reports/st3).
 
 ```{r basics, cache=FALSE,warning=FALSE,message=FALSE}
 #packages used
@@ -77,9 +75,6 @@ download_forbidden_file <- function(url, destfile,refer="https://www.aer.ca/") {
 }
 ```
 
-# Download the Data
-
-Once you've got the preliminaries of the code, downloading the data is fairly easy.  Each of the data files are stored by year, with the exception of the current year which has a different naming convention.  The first step is to access the data (click on the code button to see how to do things in R if you're interested).  The code also includes some fixes for names of projects which are not consistent in the data.  This is basically a trial and error process to find broken data series.
 
 ```{r st3_data, cache=FALSE,warning=FALSE,message=FALSE} 
 #I'm going to make a function here so that I can specify whether I want to download all/none/new
@@ -288,7 +283,6 @@ With the data downloaded and compiled into a single file, with annual and quarte
 
 
 ```{r st3_graphs, cache=FALSE,warning=FALSE,message=FALSE}
-
 dispo<-
   ggplot(filter(all_production,product%in%c("Total Alberta Use","Removals from Alberta")))+
   geom_area(aes(date,m3_bbl(production)/days_in_month(date)/10^6,group=product,fill=product),color="black", size=0.5)+
@@ -435,25 +429,12 @@ oil_sands_plain<-ggplot(filter(all_production,product%in%graph_data,product!="To
        #title="Alberta Oil Sands Bitumen Production",
        #caption=paste("Source: AER ST-3 data current to ",format.Date(max(all_production$date),format = "%B %Y")  ,", graph #by @andrew_leach",sep=""))
 
-
 #if you want to create a png in normal code, use this
 ggsave(plot=oil_sands,filename = "st3_oil_sands_prod.png",width=12,height=6,dpi=300,bg="white")
 ```
 
-### Oil sands
 
-```{r oil_sands, fig.width=12, fig.height=7,dpi=300}
-oil_sands
-```
-
-
-```{r oil_sands_plain, fig.width=14,fig.height=7,dpi=300}
-oil_sands_plain
-```
-[Click here for high-resolution, colour image](st3_oil_sands_prod.png)
-
-
-### All production
+### All production, 2015-present
 
 ```{r all_crude, fig.width=14,fig.height=7,dpi=300}
 all_crude_short
@@ -461,6 +442,7 @@ ggsave(plot=all_crude_short,filename = "st3_oil_prod_short.png",width=16,height=
 ```
 [Click here for high-resolution image](st3_oil_prod_short.png)
 
+### All production, 2010-present
 
 ```{r all_crude_short, fig.width=14,fig.height=7,dpi=300}
 all_crude
@@ -471,13 +453,79 @@ ggsave(plot=all_crude,filename = "st3_oil_prod.png",width=16,height=7,dpi=300,bg
 [Click here for high-resolution image](st3_oil_prod.png)
 
 
+### Annual production history from ST-98 (mmbbl/d)
+
+```{r all_crude_st98, fig.width=14,fig.height=7,dpi=300,message=FALSE,warning=FALSE}
+
+#get longer history files from ST98
+
+
+#download.file("https://www.aer.ca/documents/sts/st98/2025/st98-2025-executive-summary-data.xlsx",mode="wb",dest="st98_exec.xlsx")
+energy_supply<-read_excel("st98_exec.xlsx",sheet="Figures",range="BR33:CD71")%>%slice(-1)%>%
+    mutate(
+    # First column to integer
+    across(1, as.integer),
+    # All other columns to numeric
+    across(-1, as.numeric)
+  )%>%
+  select(1,8:12) %>%
+  rename_with(~ str_remove(., "\\n.*"))%>%
+  rename_with(~ str_remove(., "\\r.*"))%>%
+  #clean_names()%>%
+  pivot_longer(-Year,values_to="production_mmbbld",names_to = "crude_stream")
+
+st_98<-ggplot(energy_supply%>%
+         filter(Year<=2025)%>%
+          mutate(crude_stream=as_factor(crude_stream),
+                 crude_stream=fct_recode(crude_stream,"Pentanes Plus and Condensate"="Pentanes plus and condensate"),
+                 crude_stream=fct_recode(crude_stream,"Light and Medium Crude Oil"="Light and medium"),
+                 crude_stream=fct_recode(crude_stream,"Heavy Crude Oil"="Heavy"),
+                 crude_stream=fct_recode(crude_stream,"Upgraded Bitumen"="Upgraded bitumen"),
+                 crude_stream=fct_recode(crude_stream,"Nonupgraded Bitumen"="Nonupgraded bitumen"),
+                 crude_stream=fct_relevel(crude_stream,"Pentanes Plus and Condensate"),
+          )%>%
+         I()
+         )+
+  geom_area(aes(Year,production_mmbbld,group=crude_stream,fill=crude_stream),color="black", size=0.5)+
+  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
+  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(n=10))+
+  scale_x_continuous(expand = c(0,0),breaks=pretty_breaks(n=15))+
+  guides(fill=guide_legend(nrow=1))+
+  expand_limits(y=5)+
+theme_irpp(base_size = 16)+
+  labs(y="Oil and Bitumen Production (millions of barrels per day)",x=NULL,
+       title="Alberta Condensate, Conventional Oil, and Bitumen Production",
+       #subtitle="For Operators with Production above 25k bbl/d",
+       caption=paste("Source: AER ST-98, graph by @andrew_leach",sep=""))
+
+save(st_98,file="../ab_budget/st98_prod.gph")
+
+st_98
+
+```
+
+### All liquids supply
+
 ```{r oil_upg, fig.width=15, fig.height=8,dpi=300}
 upgraded
 ```
 [Click here for high-resolution image](st3_oil_sands_upg.png)
 
-### Crude oil and bitumen disposition
 
+### Oil sands production
+
+```{r oil_sands, fig.width=12, fig.height=7,dpi=300}
+oil_sands
+```
+
+```{r oil_sands_plain, fig.width=14,fig.height=7,dpi=300}
+oil_sands_plain
+```
+
+[Click here for high-resolution, colour image](st3_oil_sands_prod.png)
+
+
+### Crude oil and bitumen disposition
 
 ```{r oil_dispo, fig.width=15, fig.height=8,dpi=300}
 dispo
@@ -606,53 +654,4 @@ all_crude+
 
 ```
 
-### Annual Production History from ST-98 (mmbbl/d)
 
-```{r all_crude_st98, fig.width=14,fig.height=7,dpi=300,message=FALSE,warning=FALSE}
-
-#get longer history files from ST98
-
-
-#download.file("https://www.aer.ca/documents/sts/st98/2025/st98-2025-executive-summary-data.xlsx",mode="wb",dest="st98_exec.xlsx")
-energy_supply<-read_excel("st98_exec.xlsx",sheet="Figures",range="BR33:CD71")%>%slice(-1)%>%
-    mutate(
-    # First column to integer
-    across(1, as.integer),
-    # All other columns to numeric
-    across(-1, as.numeric)
-  )%>%
-  select(1,8:12) %>%
-  rename_with(~ str_remove(., "\\n.*"))%>%
-  rename_with(~ str_remove(., "\\r.*"))%>%
-  #clean_names()%>%
-  pivot_longer(-Year,values_to="production_mmbbld",names_to = "crude_stream")
-
-st_98<-ggplot(energy_supply%>%
-         filter(Year<=2025)%>%
-          mutate(crude_stream=as_factor(crude_stream),
-                 crude_stream=fct_recode(crude_stream,"Pentanes Plus and Condensate"="Pentanes plus and condensate"),
-                 crude_stream=fct_recode(crude_stream,"Light and Medium Crude Oil"="Light and medium"),
-                 crude_stream=fct_recode(crude_stream,"Heavy Crude Oil"="Heavy"),
-                 crude_stream=fct_recode(crude_stream,"Upgraded Bitumen"="Upgraded bitumen"),
-                 crude_stream=fct_recode(crude_stream,"Nonupgraded Bitumen"="Nonupgraded bitumen"),
-                 crude_stream=fct_relevel(crude_stream,"Pentanes Plus and Condensate"),
-          )%>%
-         I()
-         )+
-  geom_area(aes(Year,production_mmbbld,group=crude_stream,fill=crude_stream),color="black", size=0.5)+
-  scale_fill_manual("",values = pal_jco()(10),guide = "legend")+
-  scale_y_continuous(expand = c(0,0),breaks=pretty_breaks(n=10))+
-  scale_x_continuous(expand = c(0,0),breaks=pretty_breaks(n=15))+
-  guides(fill=guide_legend(nrow=1))+
-  expand_limits(y=5)+
-theme_irpp(base_size = 16)+
-  labs(y="Oil and Bitumen Production (millions of barrels per day)",x=NULL,
-       title="Alberta Condensate, Conventional Oil, and Bitumen Production",
-       #subtitle="For Operators with Production above 25k bbl/d",
-       caption=paste("Source: AER ST-98, graph by @andrew_leach",sep=""))
-
-save(st_98,file="../ab_budget/st98_prod.gph")
-
-st_98
-
-```
